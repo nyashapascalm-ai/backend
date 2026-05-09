@@ -1,6 +1,8 @@
 import { Router } from "express";
 import prisma from "../lib/prisma.js";
 import { z } from "zod";
+import { requireAuth } from "../middleware/auth.js";
+
 const router = Router();
 
 const productSchema = z.object({
@@ -31,7 +33,7 @@ router.get("/:id", async (req, res) => {
   }
 });
 
-router.post("/", async (req, res) => {
+router.post("/", requireAuth, async (req, res) => {
   const result = productSchema.safeParse(req.body);
   if (!result.success) {
     return res.status(400).json({ errors: result.error.flatten().fieldErrors });
@@ -45,7 +47,7 @@ router.post("/", async (req, res) => {
   }
 });
 
-router.put("/:id", async (req, res) => {
+router.put("/:id", requireAuth, async (req, res) => {
   const id = parseInt(req.params.id);
   const result = productSchema.safeParse(req.body);
   if (!result.success) {
@@ -63,7 +65,7 @@ router.put("/:id", async (req, res) => {
   }
 });
 
-router.delete("/:id", async (req, res) => {
+router.delete("/:id", requireAuth, async (req, res) => {
   const id = parseInt(req.params.id);
   try {
     await prisma.product.delete({ where: { id } });
