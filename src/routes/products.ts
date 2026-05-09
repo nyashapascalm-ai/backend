@@ -13,9 +13,9 @@ router.get("/", async (req, res) => {
   try {
     const products = await prisma.product.findMany();
     res.json(products);
-  } catch (err) {
-    console.error("Products error:", err);
-    res.status(500).json({ error: "Failed to fetch products" });
+  } catch (err: any) {
+    console.error("Products error:", err?.message, err?.code, err?.meta);
+    res.status(500).json({ error: err?.message || "Failed to fetch products" });
   }
 });
 
@@ -25,9 +25,9 @@ router.get("/:id", async (req, res) => {
     const product = await prisma.product.findUnique({ where: { id } });
     if (!product) return res.status(404).json({ error: "Product not found" });
     res.json(product);
-  } catch (err) {
-    console.error("Get product error:", err);
-    res.status(500).json({ error: "Failed to fetch product" });
+  } catch (err: any) {
+    console.error("Get product error:", err?.message, err?.code);
+    res.status(500).json({ error: err?.message || "Failed to fetch product" });
   }
 });
 
@@ -39,9 +39,9 @@ router.post("/", async (req, res) => {
   try {
     const product = await prisma.product.create({ data: result.data });
     res.json(product);
-  } catch (err) {
-    console.error("Create error:", err);
-    res.status(500).json({ error: "Failed to create product" });
+  } catch (err: any) {
+    console.error("Create error:", err?.message, err?.code);
+    res.status(500).json({ error: err?.message || "Failed to create product" });
   }
 });
 
@@ -57,9 +57,9 @@ router.put("/:id", async (req, res) => {
       data: result.data,
     });
     res.json(product);
-  } catch (err) {
-    console.error("Update error:", err);
-    res.status(500).json({ error: "Failed to update product" });
+  } catch (err: any) {
+    console.error("Update error:", err?.message, err?.code);
+    res.status(500).json({ error: err?.message || "Failed to update product" });
   }
 });
 
@@ -68,9 +68,9 @@ router.delete("/:id", async (req, res) => {
   try {
     await prisma.product.delete({ where: { id } });
     res.json({ message: "Product deleted" });
-  } catch (err) {
-    console.error("Delete error:", err);
-    res.status(500).json({ error: "Failed to delete product" });
+  } catch (err: any) {
+    console.error("Delete error:", err?.message, err?.code);
+    res.status(500).json({ error: err?.message || "Failed to delete product" });
   }
 });
 
