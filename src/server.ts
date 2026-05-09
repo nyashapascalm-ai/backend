@@ -3,6 +3,7 @@ import cors from 'cors';
 import dotenv from 'dotenv';
 import productsRouter from './routes/products.ts';
 import authRouter from './routes/auth.ts';
+import contentRouter from './routes/content.ts';
 
 dotenv.config();
 
@@ -20,6 +21,7 @@ app.get('/health', (req, res) => {
 
 app.use('/products', productsRouter);
 app.use('/auth', authRouter);
+app.use('/content', contentRouter);
 
 const PORT = process.env.PORT || 3000;
 app.listen(PORT, () => {
