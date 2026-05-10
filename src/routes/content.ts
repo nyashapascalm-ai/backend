@@ -12,17 +12,22 @@ async function generateForProduct(productId: number, type: string, anthropic: An
   const niche = product.category || "General";
   const nicheContext: Record<string, string> = {
     "AI Tools": "Target audience: entrepreneurs, content creators, and tech-savvy professionals who want to save time and boost productivity. Use language around efficiency, automation, and staying ahead of the competition.",
+    "Tech": "Target audience: tech enthusiasts and early adopters. Use language around innovation, performance, cutting-edge features, and solving problems.",
+    "Tech & AI Tools": "Target audience: entrepreneurs and tech professionals. Use language around productivity, ROI, automation, and competitive advantage.",
     "Finance": "Target audience: people wanting financial freedom, passive income, or better money management. Use language around wealth building, saving money, financial security, and smart investing.",
     "Fitness": "Target audience: people wanting to lose weight, build muscle, or improve health. Use language around transformation, energy, confidence, and achieving body goals.",
     "Health": "Target audience: health-conscious people wanting to feel better and live longer. Use language around wellness, vitality, natural solutions, and prevention.",
+    "Health & Wellness": "Target audience: health-conscious people wanting to feel better and live longer. Use language around wellness, vitality, natural solutions, and prevention.",
     "Beauty": "Target audience: people wanting to look and feel their best. Use language around confidence, glow, transformation, and self-care.",
+    "Home & Garden": "Target audience: homeowners wanting a beautiful, functional home. Use language around comfort, style, transformation, and value.",
     "Home Office": "Target audience: remote workers and entrepreneurs wanting a better workspace. Use language around productivity, comfort, professionalism, and work-life balance.",
-    "Tech": "Target audience: tech enthusiasts and early adopters. Use language around innovation, performance, cutting-edge features, and solving problems.",
     "Education": "Target audience: people wanting to learn new skills or advance their career. Use language around growth, opportunity, expertise, and future-proofing.",
     "Gaming": "Target audience: gamers wanting better performance and experience. Use language around competitive edge, immersion, performance, and leveling up.",
     "Business": "Target audience: entrepreneurs and business owners. Use language around ROI, growth, scaling, and competitive advantage.",
     "Fashion": "Target audience: style-conscious shoppers wanting to look great. Use language around trends, style, confidence, and self-expression.",
     "Parenting": "Target audience: parents wanting the best for their children. Use language around safety, development, joy, and making memories.",
+    "Baby & Parenting": "Target audience: parents wanting the best for their children. Use language around safety, development, joy, and making memories.",
+    "Pet Care": "Target audience: pet owners who treat their pets like family. Use language around love, health, happiness, and giving pets the best life.",
   };
 
   const audienceContext = nicheContext[niche] || "Target a broad audience interested in quality products that solve real problems.";
@@ -83,10 +88,27 @@ router.post("/generate-bulk", requireAuth, async (req, res) => {
       ? await prisma.product.findMany({ where: { id: { in: productIds }, status: "active" } })
       : await prisma.product.findMany({ where: { status: "active" } });
 
-    const results = { created: 0, failed: 0, errors: [] as string[] };
+    // For each type, find products that already have content of that type
+    // to avoid generating duplicates
+    const existingContent = await prisma.content.findMany({
+      where: {
+        type: { in: types },
+        productId: { in: products.map(p => p.id) },
+      },
+      select: { productId: true, type: true },
+    });
+
+    const existingSet = new Set(existingContent.map(c => `${c.productId}-${c.type}`));
+
+    const results = { created: 0, failed: 0, skipped: 0, errors: [] as string[] };
 
     for (const product of products) {
       for (const type of types) {
+        const key = `${product.id}-${type}`;
+        if (existingSet.has(key)) {
+          results.skipped++;
+          continue;
+        }
         try {
           await generateForProduct(product.id, type, anthropic);
           results.created++;
@@ -98,7 +120,7 @@ router.post("/generate-bulk", requireAuth, async (req, res) => {
     }
 
     res.json({
-      message: `Bulk generation complete. ${results.created} pieces created, ${results.failed} failed.`,
+      message: `Bulk generation complete. ${results.created} pieces created, ${results.skipped} skipped (already exist), ${results.failed} failed.`,
       ...results,
     });
   } catch (err: any) {
