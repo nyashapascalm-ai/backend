@@ -9,6 +9,7 @@ const productSchema = z.object({
   name: z.string().min(1, "Name is required"),
   description: z.string().optional(),
   price: z.number().positive("Price must be positive"),
+  currency: z.string().optional(),
   affiliateLink: z.string().url().optional(),
   commissionRate: z.number().min(0).max(100).optional(),
   network: z.string().optional(),

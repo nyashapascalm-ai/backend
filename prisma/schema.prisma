@@ -11,6 +11,7 @@ model Product {
   name               String
   description        String?
   price              Float
+  currency           String    @default("USD")
   affiliateLink      String?
   commissionRate     Float?
   network            String?
