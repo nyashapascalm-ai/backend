@@ -94,6 +94,37 @@ async function setFeaturedImage(postId: number, mediaId: number): Promise<boolea
   }
 }
 
+router.post("/fix-post-urls", requireAuth, async (req, res) => {
+  try {
+    const published = await prisma.content.findMany({
+      where: { type: "blog", status: "published" },
+    });
+
+    let fixed = 0;
+    for (const content of published) {
+      if (content.postUrl?.includes("hostingersite.com")) {
+        const newUrl = content.postUrl.replace(
+          "https://hotpink-jay-474959.hostingersite.com",
+          "https://mumdeals.co.uk"
+        );
+        await prisma.content.update({
+          where: { id: content.id },
+          data: { postUrl: newUrl },
+        });
+        fixed++;
+      }
+    }
+
+    res.json({
+      message: `Fixed ${fixed} post URLs from hostingersite.com to mumdeals.co.uk`,
+      fixed,
+      total: published.length,
+    });
+  } catch (err: any) {
+    res.status(500).json({ error: err?.message || "Failed to fix URLs" });
+  }
+});
+
 router.post("/add-featured-images", requireAuth, async (req, res) => {
   try {
     const publishedContent = await prisma.content.findMany({
@@ -103,7 +134,6 @@ router.post("/add-featured-images", requireAuth, async (req, res) => {
 
     const results = { updated: 0, failed: 0, skipped: 0 };
 
-    // Fetch all WordPress posts
     const wpRes = await fetch(`${WP_URL}/wp-json/wp/v2/posts?per_page=100&orderby=date&order=desc`, {
       headers: { Authorization: `Basic ${WP_AUTH}` },
     });
@@ -111,7 +141,6 @@ router.post("/add-featured-images", requireAuth, async (req, res) => {
 
     for (const content of publishedContent) {
       try {
-        // Match by URL (normalised) or title (decoded HTML entities)
         const wpPost = wpPosts.find((p: any) =>
           normalizeUrl(p.link) === normalizeUrl(content.postUrl) ||
           normalizeTitle(p.title?.rendered) === normalizeTitle(content.title)
@@ -123,17 +152,15 @@ router.post("/add-featured-images", requireAuth, async (req, res) => {
           continue;
         }
 
-        // Skip if already has a featured image
         if (wpPost.featured_media && wpPost.featured_media > 0) {
           results.skipped++;
           continue;
         }
 
-        // Search Unsplash for relevant image
         const searchQuery = `${content.product.category || "lifestyle"} ${content.product.name}`.trim();
         const image = await searchUnsplashImage(searchQuery);
+
         if (!image) {
-          // Try fallback search with just category
           const fallback = await searchUnsplashImage(content.product.category || "baby parenting");
           if (!fallback) { results.failed++; continue; }
           const mediaId = await uploadImageToWordPress(fallback.url, content.product.name, fallback.photographer);
