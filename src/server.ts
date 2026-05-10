@@ -9,6 +9,7 @@ import alertsRouter from './routes/alerts.ts';
 import importRouter from './routes/import.ts';
 import reportsRouter from './routes/reports.ts';
 import awinRouter from './routes/awin.ts';
+import wordpressRouter from './routes/wordpress.ts';
 
 const app = express();
 app.use(cors());
@@ -41,6 +42,7 @@ app.use('/alerts', alertsRouter);
 app.use('/import', importRouter);
 app.use('/reports', reportsRouter);
 app.use('/awin', awinRouter);
+app.use('/wordpress', wordpressRouter);
 
 const PORT = process.env.PORT || 3000;
 app.listen(PORT, () => {
