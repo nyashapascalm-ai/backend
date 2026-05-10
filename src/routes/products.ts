@@ -16,6 +16,7 @@ const productSchema = z.object({
   profitabilityScore: z.number().optional(),
   trendScore: z.number().optional(),
   status: z.string().optional(),
+  slug: z.string().optional(),
 });
 
 router.get("/", async (req, res) => {
