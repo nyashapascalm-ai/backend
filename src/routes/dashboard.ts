@@ -4,6 +4,9 @@ import { requireAuth } from "../middleware/auth.js";
 
 const router = Router();
 
+const PUBLISHER_ID = process.env.AWIN_PUBLISHER_ID || "2660114";
+const API_TOKEN = process.env.AWIN_API_TOKEN || "7c2db1e6-a8bb-4ae4-8116-71551e5e66e5";
+
 router.get("/", requireAuth, async (req, res) => {
   try {
     const products = await prisma.product.findMany({
@@ -34,6 +37,7 @@ router.get("/", requireAuth, async (req, res) => {
         category: p.category,
         network: p.network,
         price: p.price,
+        currency: p.currency,
         commissionRate: p.commissionRate,
         status: p.status,
         slug: p.slug,
@@ -56,6 +60,27 @@ router.get("/", requireAuth, async (req, res) => {
     const totalContent = productStats.reduce((sum, p) => sum + p.contentCount, 0);
     const topProduct = productStats.sort((a, b) => b.estimatedEarnings - a.estimatedEarnings)[0];
 
+    // Fetch real Awin transactions
+    let awinRevenue = 0;
+    let awinTransactions = 0;
+    let awinPending = 0;
+    try {
+      const start = last30d.toISOString().split("T")[0];
+      const end = now.toISOString().split("T")[0];
+      const awinRes = await fetch(
+        `https://api.awin.com/publishers/${PUBLISHER_ID}/transactions/?startDate=${start}T00:00:00&endDate=${end}T23:59:59&timezone=UTC`,
+        { headers: { Authorization: `Bearer ${API_TOKEN}` } }
+      );
+      const awinData = await awinRes.json();
+      if (Array.isArray(awinData)) {
+        awinTransactions = awinData.length;
+        awinRevenue = awinData.reduce((sum: number, t: any) => sum + (parseFloat(t.commissionAmount?.amount) || 0), 0);
+        awinPending = awinData.filter((t: any) => t.commissionStatus === "pending").length;
+      }
+    } catch (e) {
+      console.log("Awin fetch skipped");
+    }
+
     res.json({
       summary: {
         totalEarnings: Math.round(totalEarnings * 100) / 100,
@@ -65,6 +90,9 @@ router.get("/", requireAuth, async (req, res) => {
         totalProducts: products.length,
         totalContent,
         topProduct: topProduct?.name ?? null,
+        awinRevenue: Math.round(awinRevenue * 100) / 100,
+        awinTransactions,
+        awinPending,
       },
       products: productStats.sort((a, b) => b.estimatedEarnings - a.estimatedEarnings),
     });
