@@ -8,6 +8,7 @@ import dashboardRouter from './routes/dashboard.ts';
 import alertsRouter from './routes/alerts.ts';
 import importRouter from './routes/import.ts';
 import reportsRouter from './routes/reports.ts';
+import awinRouter from './routes/awin.ts';
 
 const app = express();
 app.use(cors());
@@ -26,6 +27,7 @@ app.get('/debug-env', (req, res) => {
     hasAnthropicKey: !!process.env.ANTHROPIC_API_KEY,
     hasDbUrl: !!process.env.DATABASE_URL,
     hasResendKey: !!process.env.RESEND_API_KEY,
+    hasAwinToken: !!process.env.AWIN_API_TOKEN,
     nodeEnv: process.env.NODE_ENV,
   });
 });
@@ -38,6 +40,7 @@ app.use('/dashboard', dashboardRouter);
 app.use('/alerts', alertsRouter);
 app.use('/import', importRouter);
 app.use('/reports', reportsRouter);
+app.use('/awin', awinRouter);
 
 const PORT = process.env.PORT || 3000;
 app.listen(PORT, () => {
