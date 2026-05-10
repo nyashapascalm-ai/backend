@@ -19,6 +19,14 @@ app.get('/health', (req, res) => {
   res.json({ status: 'ok' });
 });
 
+app.get('/debug-env', (req, res) => {
+  res.json({
+    hasAnthropicKey: !!process.env.ANTHROPIC_API_KEY,
+    hasDbUrl: !!process.env.DATABASE_URL,
+    nodeEnv: process.env.NODE_ENV,
+  });
+});
+
 app.use('/products', productsRouter);
 app.use('/auth', authRouter);
 app.use('/content', contentRouter);
