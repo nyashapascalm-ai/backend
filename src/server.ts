@@ -6,6 +6,7 @@ import contentRouter from './routes/content.ts';
 import trackRouter from './routes/track.ts';
 import dashboardRouter from './routes/dashboard.ts';
 import alertsRouter from './routes/alerts.ts';
+import importRouter from './routes/import.ts';
 
 const app = express();
 app.use(cors());
@@ -34,6 +35,7 @@ app.use('/content', contentRouter);
 app.use('/track', trackRouter);
 app.use('/dashboard', dashboardRouter);
 app.use('/alerts', alertsRouter);
+app.use('/import', importRouter);
 
 const PORT = process.env.PORT || 3000;
 app.listen(PORT, () => {
