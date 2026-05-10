@@ -1,7 +1,10 @@
 import { Router } from "express";
 import Anthropic from "@anthropic-ai/sdk";
+import dotenv from "dotenv";
 import prisma from "../lib/prisma.js";
 import { requireAuth } from "../middleware/auth.js";
+
+dotenv.config();
 
 const router = Router();
 const anthropic = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY });
@@ -25,7 +28,8 @@ router.post("/generate/:productId", requireAuth, async (req, res) => {
       messages: [{ role: "user", content: prompt }],
     });
     const text = message.content[0].type === "text" ? message.content[0].text : "";
-    const parsed = JSON.parse(text);
+    const clean = text.replace(/```json|```/g, "").trim();
+    const parsed = JSON.parse(clean);
     const content = await prisma.content.create({
       data: {
         productId,
