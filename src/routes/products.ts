@@ -112,9 +112,10 @@ router.delete("/:id", requireAuth, async (req, res) => {
 });
 
 router.post("/autotag", requireAuth, async (req, res) => {
+  const { force } = req.body;
   try {
     const products = await prisma.product.findMany({
-      where: { OR: [{ category: null }, { category: "" }] },
+      where: force ? {} : { OR: [{ category: null }, { category: "" }] },
     });
     let tagged = 0;
     for (const p of products) {
@@ -122,7 +123,7 @@ router.post("/autotag", requireAuth, async (req, res) => {
       await prisma.product.update({ where: { id: p.id }, data: { category } });
       tagged++;
     }
-    res.json({ message: `Auto-tagged ${tagged} products` });
+    res.json({ message: `Auto-tagged ${tagged} products`, tagged });
   } catch (err: any) {
     console.error("Autotag error:", err?.message);
     res.status(500).json({ error: err?.message || "Failed to auto-tag" });
