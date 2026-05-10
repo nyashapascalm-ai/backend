@@ -5,6 +5,7 @@ import authRouter from './routes/auth.ts';
 import contentRouter from './routes/content.ts';
 import trackRouter from './routes/track.ts';
 import dashboardRouter from './routes/dashboard.ts';
+import alertsRouter from './routes/alerts.ts';
 
 const app = express();
 app.use(cors());
@@ -22,6 +23,7 @@ app.get('/debug-env', (req, res) => {
   res.json({
     hasAnthropicKey: !!process.env.ANTHROPIC_API_KEY,
     hasDbUrl: !!process.env.DATABASE_URL,
+    hasResendKey: !!process.env.RESEND_API_KEY,
     nodeEnv: process.env.NODE_ENV,
   });
 });
@@ -31,6 +33,7 @@ app.use('/auth', authRouter);
 app.use('/content', contentRouter);
 app.use('/track', trackRouter);
 app.use('/dashboard', dashboardRouter);
+app.use('/alerts', alertsRouter);
 
 const PORT = process.env.PORT || 3000;
 app.listen(PORT, () => {
