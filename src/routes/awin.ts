@@ -5,7 +5,7 @@ import { requireAuth } from "../middleware/auth.js";
 const router = Router();
 
 const PUBLISHER_ID = process.env.AWIN_PUBLISHER_ID || "2660114";
-const API_TOKEN = process.env.AWIN_API_TOKEN || "10daf2dbf3dde45a5a7275beb3e4bd51";
+const API_TOKEN = process.env.AWIN_API_TOKEN || "7c2db1e6-a8bb-4ae4-8116-71551e5e66e5";
 
 router.get("/programmes", requireAuth, async (req, res) => {
   try {
@@ -29,7 +29,7 @@ router.get("/programmes", requireAuth, async (req, res) => {
 router.get("/products", requireAuth, async (req, res) => {
   const { category, keyword, limit = "20" } = req.query;
   try {
-    const feedUrl = `https://ui.awin.com/productdata-darwin-download/publisher/${PUBLISHER_ID}/${API_TOKEN}/1/feedList`;
+    const feedUrl = `https://ui.awin.com/productdata-darwin-download/publisher/${PUBLISHER_ID}/10daf2dbf3dde45a5a7275beb3e4bd51/1/feedList`;
     const feedRes = await fetch(feedUrl);
     const feedData = await feedRes.json();
     res.json({ feeds: feedData, message: "Feed list retrieved" });
