@@ -4,11 +4,11 @@ import prisma from "../lib/prisma.js";
 import { requireAuth } from "../middleware/auth.js";
 
 const router = Router();
-const anthropic = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY });
 
 router.post("/generate/:productId", requireAuth, async (req, res) => {
   const productId = parseInt(req.params.productId);
   const { type } = req.body;
+  const anthropic = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY });
   try {
     const product = await prisma.product.findUnique({ where: { id: productId } });
     if (!product) return res.status(404).json({ error: "Product not found" });
