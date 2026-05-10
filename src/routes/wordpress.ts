@@ -9,6 +9,55 @@ const WP_USER = process.env.WP_USER || "nyashapascalm@gmail.com";
 const WP_PASSWORD = process.env.WP_PASSWORD || "oRg4 U5w3 Ie3C u2ej daxP n7kv";
 const WP_AUTH = Buffer.from(`${WP_USER}:${WP_PASSWORD}`).toString("base64");
 
+// Map product category to WordPress category ID
+// These IDs come from your WordPress instance
+const CATEGORY_MAP: Record<string, number> = {
+  "Parenting": 1,
+  "Baby & Parenting": 1,
+  "baby-parenting": 1,
+  "Home & Garden": 2,
+  "Home Office": 2,
+  "Pet Care": 3,
+  "Health & Wellness": 4,
+  "Health": 4,
+  "Fitness": 4,
+  "Tech & AI Tools": 5,
+  "Tech": 5,
+  "AI Tools": 5,
+};
+
+// Map product category to Pinterest board
+const PINTEREST_BOARD_MAP: Record<string, string> = {
+  "Parenting": "mumcircle3/baby-parenting-deals",
+  "Baby & Parenting": "mumcircle3/baby-parenting-deals",
+  "Home & Garden": "mumcircle3/baby-parenting-deals",
+  "Pet Care": "mumcircle3/baby-parenting-deals",
+  "Health & Wellness": "mumcircle3/baby-parenting-deals",
+  "Tech & AI Tools": "mumcircle3/baby-parenting-deals",
+};
+
+function getCategoryId(category: string | null): number {
+  if (!category) return 1;
+  return CATEGORY_MAP[category] || 1;
+}
+
+async function getWpCategoryIds(): Promise<Record<string, number>> {
+  try {
+    const res = await fetch(`${WP_URL}/wp-json/wp/v2/categories?per_page=20`, {
+      headers: { Authorization: `Basic ${WP_AUTH}` },
+    });
+    const cats = await res.json();
+    const map: Record<string, number> = {};
+    for (const cat of cats) {
+      map[cat.slug] = cat.id;
+      map[cat.name] = cat.id;
+    }
+    return map;
+  } catch {
+    return {};
+  }
+}
+
 async function buildPostContent(name: string, slug: string | null, affiliateLink: string | null, scriptText: string, cta: string) {
   const trackingLink = slug
     ? `https://backend-production-c3f5.up.railway.app/track/go/${slug}`
@@ -38,6 +87,10 @@ router.post("/publish/:contentId", requireAuth, async (req, res) => {
     if (content.type !== "blog") return res.status(400).json({ error: "Only blog content can be published" });
     if (content.status === "published") return res.status(400).json({ error: "Already published" });
 
+    const categoryIds = await getWpCategoryIds();
+    const productCategory = content.product.category || "";
+    const wpCategoryId = categoryIds[productCategory] || categoryIds["baby-parenting"] || 1;
+
     const postContent = await buildPostContent(
       content.product.name,
       content.product.slug,
@@ -57,6 +110,7 @@ router.post("/publish/:contentId", requireAuth, async (req, res) => {
         content: postContent,
         status: "publish",
         excerpt: content.caption,
+        categories: [wpCategoryId],
       }),
     });
 
@@ -71,7 +125,7 @@ router.post("/publish/:contentId", requireAuth, async (req, res) => {
       data: { status: "published", postUrl: wpPost.link },
     });
 
-    res.json({ message: "Published!", postUrl: wpPost.link, postId: wpPost.id });
+    res.json({ message: "Published!", postUrl: wpPost.link, postId: wpPost.id, category: productCategory });
   } catch (err: any) {
     console.error("WordPress error:", err?.message);
     res.status(500).json({ error: err?.message || "Failed to publish" });
@@ -80,21 +134,19 @@ router.post("/publish/:contentId", requireAuth, async (req, res) => {
 
 router.post("/publish-all-blogs", requireAuth, async (req, res) => {
   try {
-    // Get all draft blogs
+    const categoryIds = await getWpCategoryIds();
+
     const blogs = await prisma.content.findMany({
       where: { type: "blog", status: "draft" },
       include: { product: true },
       take: 20,
     });
 
-    // Get product IDs that already have a published blog post
     const alreadyPublished = await prisma.content.findMany({
       where: { type: "blog", status: "published" },
       select: { productId: true },
     });
     const publishedProductIds = new Set(alreadyPublished.map(c => c.productId));
-
-    // Filter out drafts for products that already have a published post
     const toPublish = blogs.filter(b => !publishedProductIds.has(b.productId));
     const skipped = blogs.length - toPublish.length;
 
@@ -102,6 +154,9 @@ router.post("/publish-all-blogs", requireAuth, async (req, res) => {
 
     for (const blog of toPublish) {
       try {
+        const productCategory = blog.product.category || "";
+        const wpCategoryId = categoryIds[productCategory] || categoryIds["baby-parenting"] || 1;
+
         const postContent = await buildPostContent(
           blog.product.name,
           blog.product.slug,
@@ -121,6 +176,7 @@ router.post("/publish-all-blogs", requireAuth, async (req, res) => {
             content: postContent,
             status: "publish",
             excerpt: blog.caption,
+            categories: [wpCategoryId],
           }),
         });
 
@@ -144,10 +200,19 @@ router.post("/publish-all-blogs", requireAuth, async (req, res) => {
   }
 });
 
+router.get("/categories", requireAuth, async (req, res) => {
+  try {
+    const categoryIds = await getWpCategoryIds();
+    res.json(categoryIds);
+  } catch (err: any) {
+    res.status(500).json({ error: err?.message || "Failed to fetch categories" });
+  }
+});
+
 router.get("/posts", requireAuth, async (req, res) => {
   try {
-    const wpRes = await fetch(`${WP_URL}/wp-json/wp/v2/posts?per_page=10&orderby=date&order=desc`, {
-      headers: { "Authorization": `Basic ${WP_AUTH}` },
+    const wpRes = await fetch(`${WP_URL}/wp-json/wp/v2/posts?per_page=20&orderby=date&order=desc`, {
+      headers: { Authorization: `Basic ${WP_AUTH}` },
     });
     const posts = await wpRes.json();
     res.json(posts);
