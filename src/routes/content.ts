@@ -12,21 +12,42 @@ router.post("/generate/:productId", requireAuth, async (req, res) => {
   try {
     const product = await prisma.product.findUnique({ where: { id: productId } });
     if (!product) return res.status(404).json({ error: "Product not found" });
-    const prompts: Record<string, string> = {
-      tiktok: `You are an expert affiliate marketer. Create a TikTok video script for this product. Name: ${product.name}, Description: ${product.description}, Price: $${product.price}, Category: ${product.category}, Commission: ${product.commissionRate}%. Return a JSON object with these exact fields: { "title": "hook title", "scriptText": "full spoken script 60-90 seconds", "caption": "TikTok caption under 150 chars", "hashtags": "#tag1 #tag2 #tag3 #tag4 #tag5", "thumbnailPrompt": "description for thumbnail", "cta": "call to action" }. Return only valid JSON, no other text.`,
-      blog: `You are an expert affiliate content writer. Write a blog post for this product. Name: ${product.name}, Description: ${product.description}, Price: $${product.price}, Category: ${product.category}. Return a JSON object with these exact fields: { "title": "SEO blog post title", "scriptText": "full blog post 400-600 words in markdown", "caption": "meta description under 160 chars", "hashtags": "keyword1, keyword2, keyword3", "thumbnailPrompt": "description for featured image", "cta": "call to action" }. Return only valid JSON, no other text.`,
-      instagram: `You are an expert affiliate marketer. Create an Instagram post for this product. Name: ${product.name}, Description: ${product.description}, Price: $${product.price}, Category: ${product.category}. Return a JSON object with these exact fields: { "title": "Instagram post hook", "scriptText": "full Instagram caption 150-300 words", "caption": "short version under 125 chars", "hashtags": "#tag1 #tag2 #tag3 #tag4 #tag5 #tag6 #tag7 #tag8", "thumbnailPrompt": "description for Instagram image", "cta": "call to action" }. Return only valid JSON, no other text.`,
+
+    const niche = product.category || "General";
+    const nicheContext: Record<string, string> = {
+      "AI Tools": "Target audience: entrepreneurs, content creators, and tech-savvy professionals who want to save time and boost productivity. Use language around efficiency, automation, and staying ahead of the competition.",
+      "Finance": "Target audience: people wanting financial freedom, passive income, or better money management. Use language around wealth building, saving money, financial security, and smart investing.",
+      "Fitness": "Target audience: people wanting to lose weight, build muscle, or improve health. Use language around transformation, energy, confidence, and achieving body goals.",
+      "Health": "Target audience: health-conscious people wanting to feel better and live longer. Use language around wellness, vitality, natural solutions, and prevention.",
+      "Beauty": "Target audience: people wanting to look and feel their best. Use language around confidence, glow, transformation, and self-care.",
+      "Home Office": "Target audience: remote workers and entrepreneurs wanting a better workspace. Use language around productivity, comfort, professionalism, and work-life balance.",
+      "Tech": "Target audience: tech enthusiasts and early adopters. Use language around innovation, performance, cutting-edge features, and solving problems.",
+      "Education": "Target audience: people wanting to learn new skills or advance their career. Use language around growth, opportunity, expertise, and future-proofing.",
+      "Gaming": "Target audience: gamers wanting better performance and experience. Use language around competitive edge, immersion, performance, and leveling up.",
+      "Business": "Target audience: entrepreneurs and business owners. Use language around ROI, growth, scaling, and competitive advantage.",
     };
+
+    const audienceContext = nicheContext[niche] || "Target a broad audience interested in quality products that solve real problems.";
+
+    const prompts: Record<string, string> = {
+      tiktok: `You are an expert affiliate marketer specializing in the ${niche} niche. Create a viral TikTok video script for this product. ${audienceContext} Product: ${product.name}. Description: ${product.description}. Price: ${product.price}. Commission: ${product.commissionRate}%. Return a JSON object with these exact fields: { "title": "viral hook title", "scriptText": "full spoken script 60-90 seconds with hooks and pattern interrupts", "caption": "TikTok caption under 150 chars", "hashtags": "#tag1 #tag2 #tag3 #tag4 #tag5", "thumbnailPrompt": "description for thumbnail image", "cta": "call to action" }. Return only valid JSON, no other text.`,
+      blog: `You are an expert affiliate content writer specializing in the ${niche} niche. Write a high-converting blog post for this product. ${audienceContext} Product: ${product.name}. Description: ${product.description}. Price: ${product.price}. Return a JSON object with these exact fields: { "title": "SEO-optimized blog post title", "scriptText": "full blog post 400-600 words in markdown with subheadings", "caption": "meta description under 160 chars", "hashtags": "keyword1, keyword2, keyword3, keyword4", "thumbnailPrompt": "description for featured image", "cta": "compelling call to action" }. Return only valid JSON, no other text.`,
+      instagram: `You are an expert affiliate marketer specializing in the ${niche} niche. Create a high-engagement Instagram post for this product. ${audienceContext} Product: ${product.name}. Description: ${product.description}. Price: ${product.price}. Return a JSON object with these exact fields: { "title": "Instagram post hook", "scriptText": "full Instagram caption 150-300 words with storytelling", "caption": "short version under 125 chars", "hashtags": "#tag1 #tag2 #tag3 #tag4 #tag5 #tag6 #tag7 #tag8", "thumbnailPrompt": "description for Instagram image", "cta": "call to action" }. Return only valid JSON, no other text.`,
+    };
+
     const prompt = prompts[type];
     if (!prompt) return res.status(400).json({ error: "Invalid type. Use: tiktok, blog, instagram" });
+
     const message = await anthropic.messages.create({
       model: "claude-haiku-4-5-20251001",
       max_tokens: 1500,
       messages: [{ role: "user", content: prompt }],
     });
+
     const text = message.content[0].type === "text" ? message.content[0].text : "";
     const clean = text.replace(/```json|```/g, "").trim();
     const parsed = JSON.parse(clean);
+
     const content = await prisma.content.create({
       data: {
         productId,

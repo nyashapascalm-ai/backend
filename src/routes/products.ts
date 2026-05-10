@@ -2,8 +2,23 @@ import { Router } from "express";
 import prisma from "../lib/prisma.js";
 import { z } from "zod";
 import { requireAuth } from "../middleware/auth.js";
+import Anthropic from "@anthropic-ai/sdk";
 
 const router = Router();
+
+async function autoTagNiche(name: string, description: string): Promise<string> {
+  const anthropic = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY });
+  const message = await anthropic.messages.create({
+    model: "claude-haiku-4-5-20251001",
+    max_tokens: 50,
+    messages: [{
+      role: "user",
+      content: `Classify this affiliate product into exactly ONE niche category. Product: "${name}". Description: "${description}". Choose from: AI Tools, Finance, Fitness, Home Office, Tech, Health, Beauty, Travel, Food, Education, Gaming, Parenting, Pet Care, Fashion, Business. Reply with only the category name, nothing else.`
+    }],
+  });
+  const text = message.content[0].type === "text" ? message.content[0].text.trim() : "General";
+  return text;
+}
 
 const productSchema = z.object({
   name: z.string().min(1, "Name is required"),
@@ -53,7 +68,13 @@ router.post("/", requireAuth, async (req, res) => {
     return res.status(400).json({ errors: result.error.flatten().fieldErrors });
   }
   try {
-    const product = await prisma.product.create({ data: result.data });
+    let category = result.data.category;
+    if (!category && result.data.name) {
+      category = await autoTagNiche(result.data.name, result.data.description || "");
+    }
+    const product = await prisma.product.create({
+      data: { ...result.data, category },
+    });
     res.json(product);
   } catch (err: any) {
     console.error("Create error:", err?.message);
@@ -87,6 +108,24 @@ router.delete("/:id", requireAuth, async (req, res) => {
   } catch (err: any) {
     console.error("Delete error:", err?.message);
     res.status(500).json({ error: err?.message || "Failed to delete product" });
+  }
+});
+
+router.post("/autotag", requireAuth, async (req, res) => {
+  try {
+    const products = await prisma.product.findMany({
+      where: { category: null },
+    });
+    let tagged = 0;
+    for (const p of products) {
+      const category = await autoTagNiche(p.name, p.description || "");
+      await prisma.product.update({ where: { id: p.id }, data: { category } });
+      tagged++;
+    }
+    res.json({ message: `Auto-tagged ${tagged} products` });
+  } catch (err: any) {
+    console.error("Autotag error:", err?.message);
+    res.status(500).json({ error: err?.message || "Failed to auto-tag" });
   }
 });
 
