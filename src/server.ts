@@ -4,6 +4,7 @@ import productsRouter from './routes/products.ts';
 import authRouter from './routes/auth.ts';
 import contentRouter from './routes/content.ts';
 import trackRouter from './routes/track.ts';
+import dashboardRouter from './routes/dashboard.ts';
 
 const app = express();
 app.use(cors());
@@ -29,6 +30,7 @@ app.use('/products', productsRouter);
 app.use('/auth', authRouter);
 app.use('/content', contentRouter);
 app.use('/track', trackRouter);
+app.use('/dashboard', dashboardRouter);
 
 const PORT = process.env.PORT || 3000;
 app.listen(PORT, () => {
