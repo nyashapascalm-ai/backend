@@ -3,6 +3,7 @@ import cors from 'cors';
 import productsRouter from './routes/products.ts';
 import authRouter from './routes/auth.ts';
 import contentRouter from './routes/content.ts';
+import trackRouter from './routes/track.ts';
 
 const app = express();
 app.use(cors());
@@ -27,6 +28,7 @@ app.get('/debug-env', (req, res) => {
 app.use('/products', productsRouter);
 app.use('/auth', authRouter);
 app.use('/content', contentRouter);
+app.use('/track', trackRouter);
 
 const PORT = process.env.PORT || 3000;
 app.listen(PORT, () => {

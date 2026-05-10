@@ -7,20 +7,22 @@ datasource db {
 }
 
 model Product {
-  id                Int       @id @default(autoincrement())
-  name              String
-  description       String?
-  price             Float
-  affiliateLink     String?
-  commissionRate    Float?
-  network           String?
-  category          String?
+  id                 Int       @id @default(autoincrement())
+  name               String
+  description        String?
+  price              Float
+  affiliateLink      String?
+  commissionRate     Float?
+  network            String?
+  category           String?
   profitabilityScore Float?
-  trendScore        Float?
-  status            String    @default("active")
-  createdAt         DateTime  @default(now())
-  updatedAt         DateTime  @updatedAt
-  content           Content[]
+  trendScore         Float?
+  status             String    @default("active")
+  slug               String?   @unique
+  createdAt          DateTime  @default(now())
+  updatedAt          DateTime  @updatedAt
+  content            Content[]
+  clicks             Click[]
 }
 
 model Content {
@@ -38,4 +40,15 @@ model Content {
   createdAt       DateTime @default(now())
   updatedAt       DateTime @updatedAt
   product         Product  @relation(fields: [productId], references: [id])
+}
+
+model Click {
+  id        Int      @id @default(autoincrement())
+  productId Int
+  ip        String?
+  userAgent String?
+  referer   String?
+  country   String?
+  createdAt DateTime @default(now())
+  product   Product  @relation(fields: [productId], references: [id])
 }
