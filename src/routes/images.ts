@@ -10,6 +10,20 @@ const WP_USER = process.env.WP_USER || "nyashapascalm@gmail.com";
 const WP_PASSWORD = process.env.WP_PASSWORD || "oRg4 U5w3 Ie3C u2ej daxP n7kv";
 const WP_AUTH = Buffer.from(`${WP_USER}:${WP_PASSWORD}`).toString("base64");
 
+function normalizeUrl(url: string | null | undefined): string {
+  return (url || "").replace(/\/$/, "").toLowerCase().trim();
+}
+
+function normalizeTitle(title: string | null | undefined): string {
+  return (title || "")
+    .replace(/&#8217;/g, "'")
+    .replace(/&#8216;/g, "'")
+    .replace(/&#8220;/g, '"')
+    .replace(/&#8221;/g, '"')
+    .replace(/&amp;/g, "&")
+    .trim();
+}
+
 async function searchUnsplashImage(query: string): Promise<{ url: string; description: string; photographer: string } | null> {
   try {
     const res = await fetch(
@@ -89,28 +103,47 @@ router.post("/add-featured-images", requireAuth, async (req, res) => {
 
     const results = { updated: 0, failed: 0, skipped: 0 };
 
-    const wpRes = await fetch(`${WP_URL}/wp-json/wp/v2/posts?per_page=50&orderby=date&order=desc`, {
+    // Fetch all WordPress posts
+    const wpRes = await fetch(`${WP_URL}/wp-json/wp/v2/posts?per_page=100&orderby=date&order=desc`, {
       headers: { Authorization: `Basic ${WP_AUTH}` },
     });
     const wpPosts = await wpRes.json();
 
     for (const content of publishedContent) {
       try {
+        // Match by URL (normalised) or title (decoded HTML entities)
         const wpPost = wpPosts.find((p: any) =>
-          p.title.rendered === content.title ||
-          p.link === content.postUrl
+          normalizeUrl(p.link) === normalizeUrl(content.postUrl) ||
+          normalizeTitle(p.title?.rendered) === normalizeTitle(content.title)
         );
 
-        if (!wpPost) { results.skipped++; continue; }
+        if (!wpPost) {
+          console.log(`No WP post found for: ${content.title} | URL: ${content.postUrl}`);
+          results.skipped++;
+          continue;
+        }
 
+        // Skip if already has a featured image
         if (wpPost.featured_media && wpPost.featured_media > 0) {
           results.skipped++;
           continue;
         }
 
-        const searchQuery = `${content.product.category || ""} ${content.product.name}`.trim();
+        // Search Unsplash for relevant image
+        const searchQuery = `${content.product.category || "lifestyle"} ${content.product.name}`.trim();
         const image = await searchUnsplashImage(searchQuery);
-        if (!image) { results.failed++; continue; }
+        if (!image) {
+          // Try fallback search with just category
+          const fallback = await searchUnsplashImage(content.product.category || "baby parenting");
+          if (!fallback) { results.failed++; continue; }
+          const mediaId = await uploadImageToWordPress(fallback.url, content.product.name, fallback.photographer);
+          if (!mediaId) { results.failed++; continue; }
+          const success = await setFeaturedImage(wpPost.id, mediaId);
+          if (success) results.updated++;
+          else results.failed++;
+          await new Promise(r => setTimeout(r, 1000));
+          continue;
+        }
 
         const mediaId = await uploadImageToWordPress(image.url, content.product.name, image.photographer);
         if (!mediaId) { results.failed++; continue; }
@@ -120,7 +153,8 @@ router.post("/add-featured-images", requireAuth, async (req, res) => {
         else results.failed++;
 
         await new Promise(r => setTimeout(r, 1000));
-      } catch {
+      } catch (err: any) {
+        console.error(`Image error for ${content.title}:`, err?.message);
         results.failed++;
       }
     }
