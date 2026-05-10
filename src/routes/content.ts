@@ -1,10 +1,7 @@
 import { Router } from "express";
 import Anthropic from "@anthropic-ai/sdk";
-import dotenv from "dotenv";
 import prisma from "../lib/prisma.js";
 import { requireAuth } from "../middleware/auth.js";
-
-dotenv.config();
 
 const router = Router();
 const anthropic = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY });
