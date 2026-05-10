@@ -114,7 +114,7 @@ router.delete("/:id", requireAuth, async (req, res) => {
 router.post("/autotag", requireAuth, async (req, res) => {
   try {
     const products = await prisma.product.findMany({
-      where: { category: null },
+      where: { OR: [{ category: null }, { category: "" }] },
     });
     let tagged = 0;
     for (const p of products) {
