@@ -127,13 +127,13 @@ router.post("/generate-comparison", requireAuth, async (req, res) => {
   const anthropic = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY });
 
   try {
-    // Get products for comparison
     let products;
     if (productIds?.length) {
       products = await prisma.product.findMany({
         where: { id: { in: productIds }, status: "active" },
       });
     } else {
+      // Try with category + price filter first
       products = await prisma.product.findMany({
         where: {
           status: "active",
@@ -142,10 +142,29 @@ router.post("/generate-comparison", requireAuth, async (req, res) => {
         },
         take: 8,
       });
+
+      // Fallback: try category only (ignore price filter)
+      if (products.length < 2 && maxPrice) {
+        products = await prisma.product.findMany({
+          where: {
+            status: "active",
+            ...(category ? { category } : {}),
+          },
+          take: 8,
+        });
+      }
+
+      // Final fallback: get any active products
+      if (products.length < 2) {
+        products = await prisma.product.findMany({
+          where: { status: "active" },
+          take: 8,
+        });
+      }
     }
 
     if (products.length < 2) {
-      return res.status(400).json({ error: "Need at least 2 products to generate a comparison post" });
+      return res.status(400).json({ error: "Not enough active products in database to generate a comparison post" });
     }
 
     const productList = products.map((p, i) =>
@@ -192,7 +211,6 @@ Return only valid JSON, no other text.`;
     const clean = text.replace(/```json|```/g, "").trim();
     const parsed = JSON.parse(clean);
 
-    // Save as content attached to the first product
     const content = await prisma.content.create({
       data: {
         productId: products[0].id,
