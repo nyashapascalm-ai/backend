@@ -10,30 +10,68 @@ const WP_PASSWORD = process.env.WP_PASSWORD || "oRg4 U5w3 Ie3C u2ej daxP n7kv";
 const WP_AUTH = Buffer.from(`${WP_USER}:${WP_PASSWORD}`).toString("base64");
 
 const CATEGORY_MAP: Record<string, number> = {
-  "Parenting": 1,
+  // Baby & Parenting → ID 1
   "Baby & Parenting": 1,
   "baby-parenting": 1,
+  "Parenting": 1,
+  "Baby": 1,
   "Furniture": 1,
+  "Nursery": 1,
+  "Fashion": 1,
+  "Beauty": 1,
+
+  // Home & Garden → ID 5
   "Home & Garden": 5,
   "Home Office": 5,
   "home-garden": 5,
+  "Bedding": 5,
+  "Food": 5,
+  "Garden": 5,
+  "Kitchen": 5,
+
+  // Pet Care → ID 6
   "Pet Care": 6,
   "pet-care": 6,
+  "Pets": 6,
+
+  // Health & Wellness → ID 7
   "Health & Wellness": 7,
+  "health-wellness": 7,
   "Health": 7,
   "Fitness": 7,
-  "health-wellness": 7,
+  "Wellness": 7,
+
+  // Tech & AI Tools → ID 8
   "Tech & AI Tools": 8,
+  "tech-ai-tools": 8,
   "Tech": 8,
   "AI Tools": 8,
-  "tech-ai-tools": 8,
   "Education": 8,
   "Business": 8,
   "Gaming": 8,
-  "Fashion": 1,
-  "Beauty": 1,
-  "Travel": 1,
-  "Food": 5,
+  "Software": 8,
+
+  // Finance and Insurance → ID 17
+  "Finance and Insurance": 17,
+  "finance-and-insurance": 17,
+  "Finance": 17,
+  "Insurance": 17,
+  "Money": 17,
+  "Banking": 17,
+
+  // Start up and Investment → ID 19
+  "Start up and Investment": 19,
+  "start-up-and-investment": 19,
+  "Startup": 19,
+  "Investment": 19,
+  "Entrepreneur": 19,
+
+  // Travel and Outdoors → ID 18
+  "Travel and Outdoors": 18,
+  "travel-and-outdoors": 18,
+  "Travel": 18,
+  "Outdoors": 18,
+  "Adventure": 18,
 };
 
 function getCategoryId(category: string | null): number {
@@ -54,7 +92,6 @@ async function buildPostContent(
     ? `https://backend-production-c3f5.up.railway.app/track/go/${slug}`
     : affiliateLink || "#";
 
-  // Product image shown inside the buy box only
   const productImageHtml = productImageUrl ? `
 <div style="text-align: center; margin: 16px 0;">
   <img src="${productImageUrl}" alt="${name}" style="max-width: 280px; height: auto; border-radius: 8px; box-shadow: 0 4px 16px rgba(0,0,0,0.15); border: 1px solid #e5e7eb;" />
@@ -136,7 +173,7 @@ router.post("/publish-all-blogs", requireAuth, async (req, res) => {
     const blogs = await prisma.content.findMany({
       where: { type: "blog", status: "draft" },
       include: { product: true },
-      take: 20,
+      take: 50,
     });
 
     const alreadyPublished = await prisma.content.findMany({
