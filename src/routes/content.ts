@@ -11,31 +11,31 @@ async function generateForProduct(productId: number, type: string, anthropic: An
 
   const niche = product.category || "General";
   const nicheContext: Record<string, string> = {
-    "AI Tools": "Target audience: entrepreneurs, content creators, and tech-savvy professionals who want to save time and boost productivity. Use language around efficiency, automation, and staying ahead of the competition.",
-    "Tech": "Target audience: tech enthusiasts and early adopters. Use language around innovation, performance, cutting-edge features, and solving problems.",
+    "AI Tools": "Target audience: entrepreneurs, content creators, and tech-savvy professionals who want to save time and boost productivity.",
     "Tech & AI Tools": "Target audience: entrepreneurs and tech professionals. Use language around productivity, ROI, automation, and competitive advantage.",
-    "Finance": "Target audience: people wanting financial freedom, passive income, or better money management. Use language around wealth building, saving money, financial security, and smart investing.",
-    "Fitness": "Target audience: people wanting to lose weight, build muscle, or improve health. Use language around transformation, energy, confidence, and achieving body goals.",
-    "Health": "Target audience: health-conscious people wanting to feel better and live longer. Use language around wellness, vitality, natural solutions, and prevention.",
-    "Health & Wellness": "Target audience: health-conscious people wanting to feel better and live longer. Use language around wellness, vitality, natural solutions, and prevention.",
-    "Beauty": "Target audience: people wanting to look and feel their best. Use language around confidence, glow, transformation, and self-care.",
-    "Home & Garden": "Target audience: homeowners wanting a beautiful, functional home. Use language around comfort, style, transformation, and value.",
-    "Home Office": "Target audience: remote workers and entrepreneurs wanting a better workspace. Use language around productivity, comfort, professionalism, and work-life balance.",
-    "Education": "Target audience: people wanting to learn new skills or advance their career. Use language around growth, opportunity, expertise, and future-proofing.",
-    "Gaming": "Target audience: gamers wanting better performance and experience. Use language around competitive edge, immersion, performance, and leveling up.",
-    "Business": "Target audience: entrepreneurs and business owners. Use language around ROI, growth, scaling, and competitive advantage.",
-    "Fashion": "Target audience: style-conscious shoppers wanting to look great. Use language around trends, style, confidence, and self-expression.",
-    "Parenting": "Target audience: parents wanting the best for their children. Use language around safety, development, joy, and making memories.",
+    "Finance": "Target audience: people wanting financial freedom or better money management.",
+    "Fitness": "Target audience: people wanting to lose weight, build muscle, or improve health.",
+    "Health": "Target audience: health-conscious people wanting to feel better.",
+    "Health & Wellness": "Target audience: health-conscious people wanting to feel better and live longer.",
+    "Beauty": "Target audience: people wanting to look and feel their best.",
+    "Home & Garden": "Target audience: homeowners wanting a beautiful, functional home.",
+    "Home Office": "Target audience: remote workers and entrepreneurs wanting a better workspace.",
+    "Education": "Target audience: people wanting to learn new skills or advance their career.",
+    "Gaming": "Target audience: gamers wanting better performance and experience.",
+    "Business": "Target audience: entrepreneurs and business owners.",
+    "Fashion": "Target audience: style-conscious shoppers wanting to look great.",
+    "Parenting": "Target audience: parents wanting the best for their children.",
     "Baby & Parenting": "Target audience: parents wanting the best for their children. Use language around safety, development, joy, and making memories.",
-    "Pet Care": "Target audience: pet owners who treat their pets like family. Use language around love, health, happiness, and giving pets the best life.",
+    "Furniture": "Target audience: parents setting up a nursery or home. Use language around safety, quality, and value.",
+    "Pet Care": "Target audience: pet owners who treat their pets like family.",
   };
 
-  const audienceContext = nicheContext[niche] || "Target a broad audience interested in quality products that solve real problems.";
+  const audienceContext = nicheContext[niche] || "Target a broad audience interested in quality products.";
 
   const prompts: Record<string, string> = {
     tiktok: `You are an expert affiliate marketer specializing in the ${niche} niche. Create a viral TikTok video script for this product. ${audienceContext} Product: ${product.name}. Description: ${product.description}. Price: ${product.price}. Commission: ${product.commissionRate}%. Return a JSON object with these exact fields: { "title": "viral hook title", "scriptText": "full spoken script 60-90 seconds", "caption": "TikTok caption under 150 chars", "hashtags": "#tag1 #tag2 #tag3 #tag4 #tag5", "thumbnailPrompt": "description for thumbnail", "cta": "call to action" }. Return only valid JSON, no other text.`,
-    blog: `You are an expert affiliate content writer specializing in the ${niche} niche. Write a high-converting blog post for this product. ${audienceContext} Product: ${product.name}. Description: ${product.description}. Price: ${product.price}. Return a JSON object with these exact fields: { "title": "SEO blog post title", "scriptText": "full blog post 400-600 words in markdown", "caption": "meta description under 160 chars", "hashtags": "keyword1, keyword2, keyword3", "thumbnailPrompt": "description for featured image", "cta": "call to action" }. Return only valid JSON, no other text.`,
-    instagram: `You are an expert affiliate marketer specializing in the ${niche} niche. Create a high-engagement Instagram post for this product. ${audienceContext} Product: ${product.name}. Description: ${product.description}. Price: ${product.price}. Return a JSON object with these exact fields: { "title": "Instagram post hook", "scriptText": "full Instagram caption 150-300 words", "caption": "short version under 125 chars", "hashtags": "#tag1 #tag2 #tag3 #tag4 #tag5 #tag6 #tag7 #tag8", "thumbnailPrompt": "description for Instagram image", "cta": "call to action" }. Return only valid JSON, no other text.`,
+    blog: `You are an expert affiliate content writer specializing in the ${niche} niche. Write a high-converting blog post for this product. ${audienceContext} Product: ${product.name}. Description: ${product.description}. Price: £${product.price}. Return a JSON object with these exact fields: { "title": "SEO blog post title", "scriptText": "full blog post 400-600 words in markdown", "caption": "meta description under 160 chars", "hashtags": "keyword1, keyword2, keyword3", "thumbnailPrompt": "description for featured image", "cta": "call to action" }. Return only valid JSON, no other text.`,
+    instagram: `You are an expert affiliate marketer specializing in the ${niche} niche. Create a high-engagement Instagram post for this product. ${audienceContext} Product: ${product.name}. Description: ${product.description}. Price: £${product.price}. Return a JSON object with these exact fields: { "title": "Instagram post hook", "scriptText": "full Instagram caption 150-300 words", "caption": "short version under 125 chars", "hashtags": "#tag1 #tag2 #tag3 #tag4 #tag5 #tag6 #tag7 #tag8", "thumbnailPrompt": "description for Instagram image", "cta": "call to action" }. Return only valid JSON, no other text.`,
   };
 
   const prompt = prompts[type];
@@ -88,8 +88,6 @@ router.post("/generate-bulk", requireAuth, async (req, res) => {
       ? await prisma.product.findMany({ where: { id: { in: productIds }, status: "active" } })
       : await prisma.product.findMany({ where: { status: "active" } });
 
-    // For each type, find products that already have content of that type
-    // to avoid generating duplicates
     const existingContent = await prisma.content.findMany({
       where: {
         type: { in: types },
@@ -99,16 +97,12 @@ router.post("/generate-bulk", requireAuth, async (req, res) => {
     });
 
     const existingSet = new Set(existingContent.map(c => `${c.productId}-${c.type}`));
-
     const results = { created: 0, failed: 0, skipped: 0, errors: [] as string[] };
 
     for (const product of products) {
       for (const type of types) {
         const key = `${product.id}-${type}`;
-        if (existingSet.has(key)) {
-          results.skipped++;
-          continue;
-        }
+        if (existingSet.has(key)) { results.skipped++; continue; }
         try {
           await generateForProduct(product.id, type, anthropic);
           results.created++;
@@ -124,8 +118,104 @@ router.post("/generate-bulk", requireAuth, async (req, res) => {
       ...results,
     });
   } catch (err: any) {
-    console.error("Bulk generation error:", err?.message);
     res.status(500).json({ error: err?.message || "Failed to bulk generate" });
+  }
+});
+
+router.post("/generate-comparison", requireAuth, async (req, res) => {
+  const { category, maxPrice, title: customTitle, productIds } = req.body;
+  const anthropic = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY });
+
+  try {
+    // Get products for comparison
+    let products;
+    if (productIds?.length) {
+      products = await prisma.product.findMany({
+        where: { id: { in: productIds }, status: "active" },
+      });
+    } else {
+      products = await prisma.product.findMany({
+        where: {
+          status: "active",
+          ...(category ? { category } : {}),
+          ...(maxPrice ? { price: { lte: parseFloat(maxPrice) } } : {}),
+        },
+        take: 8,
+      });
+    }
+
+    if (products.length < 2) {
+      return res.status(400).json({ error: "Need at least 2 products to generate a comparison post" });
+    }
+
+    const productList = products.map((p, i) =>
+      `${i + 1}. ${p.name} — £${p.price} — ${p.description || "No description"}`
+    ).join("\n");
+
+    const postTitle = customTitle || `Best ${category || "Products"} Under £${maxPrice || "500"} UK ${new Date().getFullYear()}`;
+
+    const prompt = `You are an expert UK affiliate content writer. Write a high-converting comparison blog post.
+
+Title: "${postTitle}"
+
+Products to compare:
+${productList}
+
+Write a detailed comparison post that:
+1. Starts with an engaging intro explaining why these products matter
+2. Has a quick comparison summary table in HTML
+3. Reviews each product with pros/cons
+4. Has a clear winner recommendation at the end
+5. Is 600-900 words total
+6. Uses UK English
+7. Is SEO-optimized for the title keywords
+
+Return a JSON object with these exact fields:
+{
+  "title": "${postTitle}",
+  "scriptText": "full blog post HTML content",
+  "caption": "meta description under 160 chars",
+  "hashtags": "keyword1, keyword2, keyword3, keyword4",
+  "thumbnailPrompt": "description for featured image",
+  "cta": "compelling call to action sentence"
+}
+
+Return only valid JSON, no other text.`;
+
+    const message = await anthropic.messages.create({
+      model: "claude-haiku-4-5-20251001",
+      max_tokens: 3000,
+      messages: [{ role: "user", content: prompt }],
+    });
+
+    const text = message.content[0].type === "text" ? message.content[0].text : "";
+    const clean = text.replace(/```json|```/g, "").trim();
+    const parsed = JSON.parse(clean);
+
+    // Save as content attached to the first product
+    const content = await prisma.content.create({
+      data: {
+        productId: products[0].id,
+        type: "blog",
+        title: parsed.title,
+        scriptText: parsed.scriptText,
+        caption: parsed.caption,
+        hashtags: parsed.hashtags,
+        thumbnailPrompt: parsed.thumbnailPrompt,
+        cta: parsed.cta,
+        status: "draft",
+      },
+    });
+
+    res.json({
+      message: `Comparison post generated: "${parsed.title}"`,
+      content,
+      productsCompared: products.length,
+      productNames: products.map(p => p.name),
+    });
+  } catch (err: any) {
+    console.error("Comparison generation error:", err?.message);
+    res.status(500).json({ error: err?.message || "Failed to generate comparison post" });
   }
 });
 
