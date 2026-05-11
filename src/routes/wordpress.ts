@@ -4,7 +4,7 @@ import { requireAuth } from "../middleware/auth.js";
 
 const router = Router();
 
-const WP_URL = process.env.WP_URL || "https://hotpink-jay-474959.hostingersite.com";
+const WP_URL = process.env.WP_URL || "https://mumdeals.co.uk";
 const WP_USER = process.env.WP_USER || "nyashapascalm@gmail.com";
 const WP_PASSWORD = process.env.WP_PASSWORD || "oRg4 U5w3 Ie3C u2ej daxP n7kv";
 const WP_AUTH = Buffer.from(`${WP_USER}:${WP_PASSWORD}`).toString("base64");
@@ -35,14 +35,10 @@ const CATEGORY_MAP: Record<string, number> = {
   "Food": 5,
 };
 
-const PINTEREST_BOARD_MAP: Record<string, string> = {
-  "Baby & Parenting": "mumcircle3/baby-parenting-deals",
-  "Parenting": "mumcircle3/baby-parenting-deals",
-  "Home & Garden": "mumcircle3/baby-parenting-deals",
-  "Pet Care": "mumcircle3/baby-parenting-deals",
-  "Health & Wellness": "mumcircle3/baby-parenting-deals",
-  "Tech & AI Tools": "mumcircle3/baby-parenting-deals",
-};
+function getCategoryId(category: string | null): number {
+  if (!category) return 1;
+  return CATEGORY_MAP[category] || 1;
+}
 
 async function getWpCategoryIds(): Promise<Record<string, number>> {
   try {
@@ -61,17 +57,25 @@ async function getWpCategoryIds(): Promise<Record<string, number>> {
   }
 }
 
-function getCategoryId(category: string | null): number {
-  if (!category) return 1;
-  return CATEGORY_MAP[category] || 1;
-}
-
-async function buildPostContent(name: string, slug: string | null, affiliateLink: string | null, scriptText: string, cta: string) {
+async function buildPostContent(
+  name: string,
+  slug: string | null,
+  affiliateLink: string | null,
+  scriptText: string,
+  cta: string,
+  imageUrl?: string | null
+) {
   const trackingLink = slug
     ? `https://backend-production-c3f5.up.railway.app/track/go/${slug}`
     : affiliateLink || "#";
 
+  const imageHtml = imageUrl ? `
+<div style="text-align: center; margin: 20px 0;">
+  <img src="${imageUrl}" alt="${name}" style="max-width: 100%; height: auto; border-radius: 8px; box-shadow: 0 2px 8px rgba(0,0,0,0.1);" />
+</div>` : "";
+
   return `
+${imageHtml}
 ${scriptText}
 
 <div style="background: #f8f9fa; border-left: 4px solid #007bff; padding: 20px; margin: 20px 0; border-radius: 4px;">
@@ -103,7 +107,8 @@ router.post("/publish/:contentId", requireAuth, async (req, res) => {
       content.product.slug,
       content.product.affiliateLink,
       content.scriptText || "",
-      content.cta || ""
+      content.cta || "",
+      content.product.imageUrl
     );
 
     const wpRes = await fetch(`${WP_URL}/wp-json/wp/v2/posts`, {
@@ -167,7 +172,8 @@ router.post("/publish-all-blogs", requireAuth, async (req, res) => {
           blog.product.slug,
           blog.product.affiliateLink,
           blog.scriptText || "",
-          blog.cta || ""
+          blog.cta || "",
+          blog.product.imageUrl
         );
 
         const wpRes = await fetch(`${WP_URL}/wp-json/wp/v2/posts`, {

@@ -78,7 +78,7 @@ router.get("/feed-products/:feedId", requireAuth, async (req, res) => {
       affiliateLink: r.aw_deep_link,
       category: r.category_name || r.merchant_category,
       network: r.merchant_name || "Awin",
-      imageUrl: r.aw_image_url,
+      imageUrl: r.aw_image_url || null,
       inStock: r.in_stock,
     }));
 
@@ -90,7 +90,7 @@ router.get("/feed-products/:feedId", requireAuth, async (req, res) => {
 });
 
 router.post("/import-product", requireAuth, async (req, res) => {
-  const { name, description, price, affiliateLink, commissionRate, category, network, currency } = req.body;
+  const { name, description, price, affiliateLink, commissionRate, category, network, currency, imageUrl } = req.body;
   try {
     const slug = name.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/(^-|-$)/g, "") + "-" + Math.random().toString(36).slice(2, 6);
     const product = await prisma.product.create({
@@ -105,6 +105,7 @@ router.post("/import-product", requireAuth, async (req, res) => {
         slug,
         status: "active",
         currency: currency || "GBP",
+        imageUrl: imageUrl || null,
       },
     });
     res.json(product);
@@ -134,6 +135,7 @@ router.post("/import-bulk", requireAuth, async (req, res) => {
           slug,
           status: "active",
           currency: p.currency || "GBP",
+          imageUrl: p.imageUrl || null,
         },
       });
       imported++;
