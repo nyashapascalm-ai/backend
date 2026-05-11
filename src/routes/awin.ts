@@ -147,6 +147,92 @@ router.post("/import-bulk", requireAuth, async (req, res) => {
   res.json({ message: `Imported ${imported} products, ${failed} failed.`, imported, failed });
 });
 
+router.post("/backfill-images", requireAuth, async (req, res) => {
+  try {
+    const products = await prisma.product.findMany({
+      where: { imageUrl: null },
+    });
+
+    if (products.length === 0) {
+      return res.json({ message: "All products already have images!", updated: 0 });
+    }
+
+    const feedProducts: Record<string, string> = {};
+
+    // Download all feeds and build image lookup map
+    for (const feed of ACTIVE_FEEDS) {
+      try {
+        const feedUrl = `https://productdata.awin.com/datafeed/download/apikey/${FEED_TOKEN}/fid/${feed.id}/format/csv/language/en/delimiter/%2C/compression/gzip/adultcontent/1/columns/aw_deep_link%2Cproduct_name%2Caw_product_id%2Cdescription%2Cmerchant_category%2Csearch_price%2Cmerchant_name%2Ccategory_name%2Caw_image_url%2Ccurrency%2Cin_stock/`;
+        const response = await fetch(feedUrl);
+        if (!response.ok) continue;
+
+        const buffer = await response.arrayBuffer();
+        const decompressed = zlib.gunzipSync(Buffer.from(buffer));
+        const csvText = decompressed.toString("utf-8");
+        const records = parse(csvText, {
+          columns: true,
+          skip_empty_lines: true,
+          trim: true,
+          relax_quotes: true,
+          relax_column_count: true,
+        }) as any[];
+
+        for (const r of records) {
+          if (r.aw_image_url && r.product_name) {
+            const key = r.product_name.toLowerCase().trim();
+            feedProducts[key] = r.aw_image_url;
+          }
+        }
+        console.log(`Feed ${feed.name}: loaded ${records.length} products`);
+      } catch (err: any) {
+        console.error(`Feed ${feed.name} failed:`, err?.message);
+        continue;
+      }
+    }
+
+    console.log(`Total feed products indexed: ${Object.keys(feedProducts).length}`);
+
+    const results = { updated: 0, notFound: 0, total: products.length };
+
+    for (const product of products) {
+      // Try exact match first
+      const key = product.name.toLowerCase().trim()
+        .replace(/&amp;/g, "&")
+        .replace(/&#038;/g, "&")
+        .replace(/\s+/g, " ");
+
+      let imageUrl = feedProducts[key];
+
+      // Try partial match if exact fails
+      if (!imageUrl) {
+        const partialKey = Object.keys(feedProducts).find(k =>
+          k.includes(key.slice(0, 30)) || key.includes(k.slice(0, 30))
+        );
+        if (partialKey) imageUrl = feedProducts[partialKey];
+      }
+
+      if (imageUrl) {
+        await prisma.product.update({
+          where: { id: product.id },
+          data: { imageUrl },
+        });
+        results.updated++;
+      } else {
+        results.notFound++;
+      }
+    }
+
+    res.json({
+      message: `Backfilled images: ${results.updated} updated out of ${results.total} products without images.`,
+      ...results,
+      feedProductsIndexed: Object.keys(feedProducts).length,
+    });
+  } catch (err: any) {
+    console.error("Backfill error:", err?.message);
+    res.status(500).json({ error: err?.message || "Failed to backfill images" });
+  }
+});
+
 router.get("/transactions", requireAuth, async (req, res) => {
   const { startDate, endDate } = req.query;
   const start = startDate || new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString().split("T")[0];
