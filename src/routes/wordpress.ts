@@ -69,28 +69,36 @@ async function buildPostContent(
     ? `https://backend-production-c3f5.up.railway.app/track/go/${slug}`
     : affiliateLink || "#";
 
-  // Use product image first, fall back to Unsplash
-  let displayImageUrl = productImageUrl;
-  if (!displayImageUrl && UNSPLASH_KEY) {
-    displayImageUrl = await fetchUnsplashImage(`${category || ""} ${name}`.trim());
+  // Top of post — Unsplash contextual image (or product image if no Unsplash)
+  let topImageUrl: string | null = null;
+  if (UNSPLASH_KEY) {
+    topImageUrl = await fetchUnsplashImage(`${category || ""} ${name}`.trim());
   }
+  if (!topImageUrl) topImageUrl = productImageUrl || null;
 
-  const imageHtml = displayImageUrl ? `
-<div style="text-align: center; margin: 20px 0;">
-  <img src="${displayImageUrl}" alt="${name}" style="max-width: 100%; height: auto; border-radius: 8px; box-shadow: 0 2px 8px rgba(0,0,0,0.1);" />
+  const topImageHtml = topImageUrl ? `
+<div style="text-align: center; margin: 0 0 24px 0;">
+  <img src="${topImageUrl}" alt="${name}" style="max-width: 100%; height: auto; border-radius: 8px;" />
+</div>` : "";
+
+  // Product image near buy button — actual product photo from Awin
+  const productImageHtml = productImageUrl ? `
+<div style="text-align: center; margin: 16px 0;">
+  <img src="${productImageUrl}" alt="${name}" style="max-width: 280px; height: auto; border-radius: 8px; box-shadow: 0 4px 16px rgba(0,0,0,0.15); border: 1px solid #e5e7eb;" />
 </div>` : "";
 
   return `
-${imageHtml}
+${topImageHtml}
 ${scriptText}
 
-<div style="background: #f8f9fa; border-left: 4px solid #007bff; padding: 20px; margin: 20px 0; border-radius: 4px;">
-  <h3 style="margin: 0 0 10px;">Ready to try ${name}?</h3>
-  <p style="margin: 0 0 15px;">${cta}</p>
-  <a href="${trackingLink}" style="background: #007bff; color: white; padding: 12px 24px; text-decoration: none; border-radius: 4px; display: inline-block; font-weight: bold;">Get ${name} →</a>
+<div style="background: #f8f9fa; border-left: 4px solid #007bff; padding: 24px; margin: 24px 0; border-radius: 8px; text-align: center;">
+  <h3 style="margin: 0 0 8px; font-size: 20px;">Ready to try ${name}?</h3>
+  <p style="margin: 0 0 16px; color: #555;">${cta}</p>
+  ${productImageHtml}
+  <a href="${trackingLink}" style="background: #007bff; color: white; padding: 14px 28px; text-decoration: none; border-radius: 6px; display: inline-block; font-weight: bold; font-size: 16px; margin-top: 16px;">Get ${name} →</a>
 </div>
 
-<p><em>Disclosure: This post contains affiliate links. We may earn a commission at no extra cost to you.</em></p>
+<p style="font-size: 12px; color: #999;"><em>Disclosure: This post contains affiliate links. We may earn a commission at no extra cost to you.</em></p>
   `.trim();
 }
 
