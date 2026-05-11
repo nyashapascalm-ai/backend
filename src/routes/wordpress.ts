@@ -13,6 +13,7 @@ const CATEGORY_MAP: Record<string, number> = {
   "Parenting": 1,
   "Baby & Parenting": 1,
   "baby-parenting": 1,
+  "Furniture": 1,
   "Home & Garden": 5,
   "Home Office": 5,
   "home-garden": 5,
@@ -38,23 +39,6 @@ const CATEGORY_MAP: Record<string, number> = {
 function getCategoryId(category: string | null): number {
   if (!category) return 1;
   return CATEGORY_MAP[category] || 1;
-}
-
-async function getWpCategoryIds(): Promise<Record<string, number>> {
-  try {
-    const res = await fetch(`${WP_URL}/wp-json/wp/v2/categories?per_page=20`, {
-      headers: { Authorization: `Basic ${WP_AUTH}` },
-    });
-    const cats = await res.json();
-    const map: Record<string, number> = {};
-    for (const cat of cats) {
-      map[cat.slug] = cat.id;
-      map[cat.name] = cat.id;
-    }
-    return map;
-  } catch {
-    return {};
-  }
 }
 
 async function buildPostContent(
@@ -212,10 +196,28 @@ router.post("/publish-all-blogs", requireAuth, async (req, res) => {
   }
 });
 
+router.post("/reset-published", requireAuth, async (req, res) => {
+  try {
+    const result = await prisma.content.updateMany({
+      where: { type: "blog", status: "published" },
+      data: { status: "draft", postUrl: null },
+    });
+    res.json({
+      message: `Reset ${result.count} published posts back to draft. You can now delete WordPress posts and republish fresh.`,
+      count: result.count,
+    });
+  } catch (err: any) {
+    res.status(500).json({ error: err?.message || "Failed to reset posts" });
+  }
+});
+
 router.get("/categories", requireAuth, async (req, res) => {
   try {
-    const categoryIds = await getWpCategoryIds();
-    res.json(categoryIds);
+    const wpRes = await fetch(`${WP_URL}/wp-json/wp/v2/categories?per_page=20`, {
+      headers: { Authorization: `Basic ${WP_AUTH}` },
+    });
+    const cats = await wpRes.json();
+    res.json(cats);
   } catch (err: any) {
     res.status(500).json({ error: err?.message || "Failed to fetch categories" });
   }
@@ -223,7 +225,7 @@ router.get("/categories", requireAuth, async (req, res) => {
 
 router.get("/posts", requireAuth, async (req, res) => {
   try {
-    const wpRes = await fetch(`${WP_URL}/wp-json/wp/v2/posts?per_page=20&orderby=date&order=desc`, {
+    const wpRes = await fetch(`${WP_URL}/wp-json/wp/v2/posts?per_page=50&orderby=date&order=desc`, {
       headers: { Authorization: `Basic ${WP_AUTH}` },
     });
     const posts = await wpRes.json();
