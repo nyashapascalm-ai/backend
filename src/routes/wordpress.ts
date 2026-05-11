@@ -8,6 +8,7 @@ const WP_URL = process.env.WP_URL || "https://mumdeals.co.uk";
 const WP_USER = process.env.WP_USER || "nyashapascalm@gmail.com";
 const WP_PASSWORD = process.env.WP_PASSWORD || "oRg4 U5w3 Ie3C u2ej daxP n7kv";
 const WP_AUTH = Buffer.from(`${WP_USER}:${WP_PASSWORD}`).toString("base64");
+const UNSPLASH_KEY = process.env.UNSPLASH_ACCESS_KEY || "";
 
 const CATEGORY_MAP: Record<string, number> = {
   "Parenting": 1,
@@ -41,21 +42,42 @@ function getCategoryId(category: string | null): number {
   return CATEGORY_MAP[category] || 1;
 }
 
+async function fetchUnsplashImage(query: string): Promise<string | null> {
+  if (!UNSPLASH_KEY) return null;
+  try {
+    const res = await fetch(
+      `https://api.unsplash.com/search/photos?query=${encodeURIComponent(query)}&per_page=1&orientation=landscape`,
+      { headers: { Authorization: `Client-ID ${UNSPLASH_KEY}` } }
+    );
+    const data = await res.json();
+    return data.results?.[0]?.urls?.regular || null;
+  } catch {
+    return null;
+  }
+}
+
 async function buildPostContent(
   name: string,
   slug: string | null,
   affiliateLink: string | null,
   scriptText: string,
   cta: string,
-  imageUrl?: string | null
+  productImageUrl?: string | null,
+  category?: string | null
 ) {
   const trackingLink = slug
     ? `https://backend-production-c3f5.up.railway.app/track/go/${slug}`
     : affiliateLink || "#";
 
-  const imageHtml = imageUrl ? `
+  // Use product image first, fall back to Unsplash
+  let displayImageUrl = productImageUrl;
+  if (!displayImageUrl && UNSPLASH_KEY) {
+    displayImageUrl = await fetchUnsplashImage(`${category || ""} ${name}`.trim());
+  }
+
+  const imageHtml = displayImageUrl ? `
 <div style="text-align: center; margin: 20px 0;">
-  <img src="${imageUrl}" alt="${name}" style="max-width: 100%; height: auto; border-radius: 8px; box-shadow: 0 2px 8px rgba(0,0,0,0.1);" />
+  <img src="${displayImageUrl}" alt="${name}" style="max-width: 100%; height: auto; border-radius: 8px; box-shadow: 0 2px 8px rgba(0,0,0,0.1);" />
 </div>` : "";
 
   return `
@@ -92,7 +114,8 @@ router.post("/publish/:contentId", requireAuth, async (req, res) => {
       content.product.affiliateLink,
       content.scriptText || "",
       content.cta || "",
-      content.product.imageUrl
+      content.product.imageUrl,
+      productCategory
     );
 
     const wpRes = await fetch(`${WP_URL}/wp-json/wp/v2/posts`, {
@@ -157,7 +180,8 @@ router.post("/publish-all-blogs", requireAuth, async (req, res) => {
           blog.product.affiliateLink,
           blog.scriptText || "",
           blog.cta || "",
-          blog.product.imageUrl
+          blog.product.imageUrl,
+          productCategory
         );
 
         const wpRes = await fetch(`${WP_URL}/wp-json/wp/v2/posts`, {
@@ -203,7 +227,7 @@ router.post("/reset-published", requireAuth, async (req, res) => {
       data: { status: "draft", postUrl: null },
     });
     res.json({
-      message: `Reset ${result.count} published posts back to draft. You can now delete WordPress posts and republish fresh.`,
+      message: `Reset ${result.count} published posts back to draft.`,
       count: result.count,
     });
   } catch (err: any) {
