@@ -8,7 +8,6 @@ const WP_URL = process.env.WP_URL || "https://mumdeals.co.uk";
 const WP_USER = process.env.WP_USER || "nyashapascalm@gmail.com";
 const WP_PASSWORD = process.env.WP_PASSWORD || "oRg4 U5w3 Ie3C u2ej daxP n7kv";
 const WP_AUTH = Buffer.from(`${WP_USER}:${WP_PASSWORD}`).toString("base64");
-const UNSPLASH_KEY = process.env.UNSPLASH_ACCESS_KEY || "";
 
 const CATEGORY_MAP: Record<string, number> = {
   "Parenting": 1,
@@ -42,20 +41,6 @@ function getCategoryId(category: string | null): number {
   return CATEGORY_MAP[category] || 1;
 }
 
-async function fetchUnsplashImage(query: string): Promise<string | null> {
-  if (!UNSPLASH_KEY) return null;
-  try {
-    const res = await fetch(
-      `https://api.unsplash.com/search/photos?query=${encodeURIComponent(query)}&per_page=1&orientation=landscape`,
-      { headers: { Authorization: `Client-ID ${UNSPLASH_KEY}` } }
-    );
-    const data = await res.json();
-    return data.results?.[0]?.urls?.regular || null;
-  } catch {
-    return null;
-  }
-}
-
 async function buildPostContent(
   name: string,
   slug: string | null,
@@ -69,26 +54,13 @@ async function buildPostContent(
     ? `https://backend-production-c3f5.up.railway.app/track/go/${slug}`
     : affiliateLink || "#";
 
-  // Top of post — Unsplash contextual image (or product image if no Unsplash)
-  let topImageUrl: string | null = null;
-  if (UNSPLASH_KEY) {
-    topImageUrl = await fetchUnsplashImage(`${category || ""} ${name}`.trim());
-  }
-  if (!topImageUrl) topImageUrl = productImageUrl || null;
-
-  const topImageHtml = topImageUrl ? `
-<div style="text-align: center; margin: 0 0 24px 0;">
-  <img src="${topImageUrl}" alt="${name}" style="max-width: 100%; height: auto; border-radius: 8px;" />
-</div>` : "";
-
-  // Product image near buy button — actual product photo from Awin
+  // Product image shown inside the buy box only
   const productImageHtml = productImageUrl ? `
 <div style="text-align: center; margin: 16px 0;">
   <img src="${productImageUrl}" alt="${name}" style="max-width: 280px; height: auto; border-radius: 8px; box-shadow: 0 4px 16px rgba(0,0,0,0.15); border: 1px solid #e5e7eb;" />
 </div>` : "";
 
   return `
-${topImageHtml}
 ${scriptText}
 
 <div style="background: #f8f9fa; border-left: 4px solid #007bff; padding: 24px; margin: 24px 0; border-radius: 8px; text-align: center;">
