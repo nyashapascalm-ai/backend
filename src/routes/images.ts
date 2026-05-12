@@ -27,7 +27,7 @@ function normalizeTitle(title: string | null | undefined): string {
 async function searchUnsplashImage(
   query: string,
   usedUrls: Set<string> = new Set()
-): Promise<{ url: string; description: string; photographer: string } | null> {
+): Promise<{ url: string; description: string; photographer: string; photographerUsername: string } | null> {
   try {
     const page = Math.floor(Math.random() * 3) + 1;
     const res = await fetch(
@@ -43,6 +43,7 @@ async function searchUnsplashImage(
           url: photo.urls.regular,
           description: photo.description || photo.alt_description || query,
           photographer: photo.user.name,
+          photographerUsername: photo.user.username,
         };
       }
     }
@@ -52,7 +53,12 @@ async function searchUnsplashImage(
   }
 }
 
-async function uploadImageToWordPress(imageUrl: string, title: string, altText: string): Promise<number | null> {
+async function uploadImageToWordPress(
+  imageUrl: string,
+  title: string,
+  photographer: string,
+  photographerUsername: string
+): Promise<number | null> {
   try {
     const imgRes = await fetch(imageUrl);
     if (!imgRes.ok) throw new Error(`Failed to fetch image: ${imgRes.status}`);
@@ -73,13 +79,16 @@ async function uploadImageToWordPress(imageUrl: string, title: string, altText: 
       throw new Error(err.message || "Media upload failed");
     }
     const media = await wpRes.json();
+
+    const attribution = `Photo by <a href="https://unsplash.com/@${photographerUsername}?utm_source=mumdeals&utm_medium=referral">${photographer}</a> on <a href="https://unsplash.com/?utm_source=mumdeals&utm_medium=referral">Unsplash</a>`;
+
     await fetch(`${WP_URL}/wp-json/wp/v2/media/${media.id}`, {
       method: "POST",
       headers: {
         Authorization: `Basic ${WP_AUTH}`,
         "Content-Type": "application/json",
       },
-      body: JSON.stringify({ alt_text: altText, caption: `Photo by ${altText} on Unsplash` }),
+      body: JSON.stringify({ alt_text: title, caption: attribution }),
     });
     return media.id;
   } catch (err: any) {
@@ -177,7 +186,6 @@ router.post("/add-featured-images", requireAuth, async (req, res) => {
           continue;
         }
 
-        // Use short keyword query for better Unsplash results
         const category = content.product.category || "lifestyle";
         const shortName = content.product.name.split(" ").slice(0, 4).join(" ");
         const searchQuery = `${category} ${shortName}`.slice(0, 60);
@@ -189,14 +197,18 @@ router.post("/add-featured-images", requireAuth, async (req, res) => {
 
         usedImageUrls.add(image.url);
 
-        const mediaId = await uploadImageToWordPress(image.url, content.product.name, image.photographer);
+        const mediaId = await uploadImageToWordPress(
+          image.url,
+          content.product.name,
+          image.photographer,
+          image.photographerUsername
+        );
         if (!mediaId) { results.failed++; continue; }
 
         const success = await setFeaturedImage(wpPost.id, mediaId);
         if (success) results.updated++;
         else results.failed++;
 
-        // Delay to avoid rate limiting
         await new Promise(r => setTimeout(r, 1200));
       } catch (err: any) {
         console.error(`Image error for ${content.title}:`, err?.message);
@@ -220,7 +232,12 @@ router.post("/add-image/:postId", requireAuth, async (req, res) => {
     const image = await searchUnsplashImage(query || "lifestyle");
     if (!image) return res.status(404).json({ error: "No image found" });
 
-    const mediaId = await uploadImageToWordPress(image.url, query, image.photographer);
+    const mediaId = await uploadImageToWordPress(
+      image.url,
+      query,
+      image.photographer,
+      image.photographerUsername
+    );
     if (!mediaId) return res.status(500).json({ error: "Failed to upload image" });
 
     const success = await setFeaturedImage(parseInt(postId), mediaId);
