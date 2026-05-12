@@ -11,13 +11,17 @@ const API_TOKEN = process.env.AWIN_API_TOKEN || "7c2db1e6-a8bb-4ae4-8116-71551e5
 const FEED_TOKEN = "10daf2dbf3dde45a5a7275beb3e4bd51";
 
 const ACTIVE_FEEDS = [
-  { id: "112637", name: "Mamas & Papas", products: 4603, currency: "GBP" },
-  { id: "60005", name: "Online Home Shop", products: 7256, currency: "GBP" },
-  { id: "71935", name: "PatPat UK", products: 26372, currency: "GBP" },
-  { id: "97411", name: "Johnston Prams", products: 5172, currency: "GBP" },
-  { id: "101126", name: "Saltrock UK", products: 4554, currency: "GBP" },
-  { id: "115013", name: "Zonky UK", products: 50, currency: "GBP" },
-  { id: "443", name: "Loft 25", products: 91, currency: "GBP" },
+  { id: "112637", name: "Mamas & Papas", category: "Baby & Parenting", currency: "GBP" },
+  { id: "60005", name: "Online Home Shop", category: "Home & Garden", currency: "GBP" },
+  { id: "71935", name: "PatPat UK", category: "Baby & Parenting", currency: "GBP" },
+  { id: "97411", name: "Johnston Prams", category: "Baby & Parenting", currency: "GBP" },
+  { id: "101126", name: "Saltrock UK", category: "Travel and Outdoors", currency: "GBP" },
+  { id: "115013", name: "Zonky UK", category: "Home & Garden", currency: "GBP" },
+  { id: "443", name: "Loft 25", category: "Home & Garden", currency: "GBP" },
+  { id: "1936", name: "Theatre Tickets Direct", category: "Travel and Outdoors", currency: "GBP" },
+  { id: "15112", name: "Tirendo UK", category: "Home & Garden", currency: "GBP" },
+  { id: "28347", name: "Sals Forever Flowers", category: "Home & Garden", currency: "GBP" },
+  { id: "62671", name: "Ulike UK", category: "Health & Wellness", currency: "GBP" },
 ];
 
 router.get("/programmes", requireAuth, async (req, res) => {
@@ -159,7 +163,6 @@ router.post("/backfill-images", requireAuth, async (req, res) => {
 
     const feedProducts: Record<string, string> = {};
 
-    // Download all feeds and build image lookup map
     for (const feed of ACTIVE_FEEDS) {
       try {
         const feedUrl = `https://productdata.awin.com/datafeed/download/apikey/${FEED_TOKEN}/fid/${feed.id}/format/csv/language/en/delimiter/%2C/compression/gzip/adultcontent/1/columns/aw_deep_link%2Cproduct_name%2Caw_product_id%2Cdescription%2Cmerchant_category%2Csearch_price%2Cmerchant_name%2Ccategory_name%2Caw_image_url%2Ccurrency%2Cin_stock/`;
@@ -190,12 +193,9 @@ router.post("/backfill-images", requireAuth, async (req, res) => {
       }
     }
 
-    console.log(`Total feed products indexed: ${Object.keys(feedProducts).length}`);
-
     const results = { updated: 0, notFound: 0, total: products.length };
 
     for (const product of products) {
-      // Try exact match first
       const key = product.name.toLowerCase().trim()
         .replace(/&amp;/g, "&")
         .replace(/&#038;/g, "&")
@@ -203,7 +203,6 @@ router.post("/backfill-images", requireAuth, async (req, res) => {
 
       let imageUrl = feedProducts[key];
 
-      // Try partial match if exact fails
       if (!imageUrl) {
         const partialKey = Object.keys(feedProducts).find(k =>
           k.includes(key.slice(0, 30)) || key.includes(k.slice(0, 30))
