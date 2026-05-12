@@ -29,30 +29,21 @@ async function searchUnsplashImage(
   usedUrls: Set<string> = new Set()
 ): Promise<{ url: string; description: string; photographer: string } | null> {
   try {
-    // Try up to 5 different pages/results to find a unique image
-    for (let attempt = 0; attempt < 5; attempt++) {
-      const page = Math.floor(Math.random() * 8) + 1;
-      const perPage = 10;
+    const page = Math.floor(Math.random() * 3) + 1;
+    const res = await fetch(
+      `https://api.unsplash.com/search/photos?query=${encodeURIComponent(query)}&per_page=10&page=${page}&orientation=landscape`,
+      { headers: { Authorization: `Client-ID ${UNSPLASH_KEY}` } }
+    );
+    const data = await res.json();
+    if (!data.results?.length) return null;
 
-      const res = await fetch(
-        `https://api.unsplash.com/search/photos?query=${encodeURIComponent(query)}&per_page=${perPage}&page=${page}&orientation=landscape`,
-        { headers: { Authorization: `Client-ID ${UNSPLASH_KEY}` } }
-      );
-      const data = await res.json();
-      if (!data.results?.length) continue;
-
-      // Shuffle results for more variety
-      const shuffled = [...data.results].sort(() => Math.random() - 0.5);
-
-      for (const photo of shuffled) {
-        const url = photo.urls.regular;
-        if (!usedUrls.has(url)) {
-          return {
-            url,
-            description: photo.description || photo.alt_description || query,
-            photographer: photo.user.name,
-          };
-        }
+    for (const photo of data.results) {
+      if (!usedUrls.has(photo.urls.regular)) {
+        return {
+          url: photo.urls.regular,
+          description: photo.description || photo.alt_description || query,
+          photographer: photo.user.name,
+        };
       }
     }
     return null;
@@ -64,6 +55,7 @@ async function searchUnsplashImage(
 async function uploadImageToWordPress(imageUrl: string, title: string, altText: string): Promise<number | null> {
   try {
     const imgRes = await fetch(imageUrl);
+    if (!imgRes.ok) throw new Error(`Failed to fetch image: ${imgRes.status}`);
     const imgBuffer = await imgRes.arrayBuffer();
     const imgBytes = Buffer.from(imgBuffer);
     const filename = title.toLowerCase().replace(/[^a-z0-9]+/g, "-").slice(0, 50) + ".jpg";
@@ -151,9 +143,8 @@ router.post("/add-featured-images", requireAuth, async (req, res) => {
     });
 
     const results = { updated: 0, failed: 0, skipped: 0 };
-    const usedImageUrls = new Set<string>(); // Track used images to prevent duplicates
+    const usedImageUrls = new Set<string>();
 
-    // Fetch WordPress posts in batches of 100
     const wpRes1 = await fetch(`${WP_URL}/wp-json/wp/v2/posts?per_page=100&orderby=date&order=desc&page=1`, {
       headers: { Authorization: `Basic ${WP_AUTH}` },
     });
@@ -164,7 +155,10 @@ router.post("/add-featured-images", requireAuth, async (req, res) => {
     });
     const wpPosts2 = wpRes2.ok ? await wpRes2.json() : [];
 
-    const wpPosts = [...(Array.isArray(wpPosts1) ? wpPosts1 : []), ...(Array.isArray(wpPosts2) ? wpPosts2 : [])];
+    const wpPosts = [
+      ...(Array.isArray(wpPosts1) ? wpPosts1 : []),
+      ...(Array.isArray(wpPosts2) ? wpPosts2 : []),
+    ];
 
     for (const content of publishedContent) {
       try {
@@ -183,23 +177,16 @@ router.post("/add-featured-images", requireAuth, async (req, res) => {
           continue;
         }
 
-        // Search with product name + category for uniqueness
-        const searchQuery = `${content.product.category || "lifestyle"} ${content.product.name}`.trim();
+        // Use short keyword query for better Unsplash results
+        const category = content.product.category || "lifestyle";
+        const shortName = content.product.name.split(" ").slice(0, 4).join(" ");
+        const searchQuery = `${category} ${shortName}`.slice(0, 60);
+
         let image = await searchUnsplashImage(searchQuery, usedImageUrls);
-
-        // Fallback to category only if no unique image found
-        if (!image) {
-          image = await searchUnsplashImage(content.product.category || "lifestyle", usedImageUrls);
-        }
-
-        // Last resort fallback
-        if (!image) {
-          image = await searchUnsplashImage("product lifestyle photography", usedImageUrls);
-        }
-
+        if (!image) image = await searchUnsplashImage(category, usedImageUrls);
+        if (!image) image = await searchUnsplashImage("shopping lifestyle", usedImageUrls);
         if (!image) { results.failed++; continue; }
 
-        // Track this URL as used
         usedImageUrls.add(image.url);
 
         const mediaId = await uploadImageToWordPress(image.url, content.product.name, image.photographer);
@@ -209,7 +196,8 @@ router.post("/add-featured-images", requireAuth, async (req, res) => {
         if (success) results.updated++;
         else results.failed++;
 
-        await new Promise(r => setTimeout(r, 800));
+        // Delay to avoid rate limiting
+        await new Promise(r => setTimeout(r, 1200));
       } catch (err: any) {
         console.error(`Image error for ${content.title}:`, err?.message);
         results.failed++;
@@ -229,7 +217,7 @@ router.post("/add-image/:postId", requireAuth, async (req, res) => {
   const { postId } = req.params;
   const { query } = req.body;
   try {
-    const image = await searchUnsplashImage(query || "baby parenting");
+    const image = await searchUnsplashImage(query || "lifestyle");
     if (!image) return res.status(404).json({ error: "No image found" });
 
     const mediaId = await uploadImageToWordPress(image.url, query, image.photographer);
