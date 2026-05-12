@@ -10,7 +10,6 @@ const WP_PASSWORD = process.env.WP_PASSWORD || "oRg4 U5w3 Ie3C u2ej daxP n7kv";
 const WP_AUTH = Buffer.from(`${WP_USER}:${WP_PASSWORD}`).toString("base64");
 
 const CATEGORY_MAP: Record<string, number> = {
-  // Baby & Parenting → ID 1
   "Baby & Parenting": 1,
   "baby-parenting": 1,
   "Parenting": 1,
@@ -19,8 +18,6 @@ const CATEGORY_MAP: Record<string, number> = {
   "Nursery": 1,
   "Fashion": 1,
   "Beauty": 1,
-
-  // Home & Garden → ID 5
   "Home & Garden": 5,
   "Home Office": 5,
   "home-garden": 5,
@@ -28,20 +25,14 @@ const CATEGORY_MAP: Record<string, number> = {
   "Food": 5,
   "Garden": 5,
   "Kitchen": 5,
-
-  // Pet Care → ID 6
   "Pet Care": 6,
   "pet-care": 6,
   "Pets": 6,
-
-  // Health & Wellness → ID 7
   "Health & Wellness": 7,
   "health-wellness": 7,
   "Health": 7,
   "Fitness": 7,
   "Wellness": 7,
-
-  // Tech & AI Tools → ID 8
   "Tech & AI Tools": 8,
   "tech-ai-tools": 8,
   "Tech": 8,
@@ -50,23 +41,17 @@ const CATEGORY_MAP: Record<string, number> = {
   "Business": 8,
   "Gaming": 8,
   "Software": 8,
-
-  // Finance and Insurance → ID 17
   "Finance and Insurance": 17,
   "finance-and-insurance": 17,
   "Finance": 17,
   "Insurance": 17,
   "Money": 17,
   "Banking": 17,
-
-  // Start up and Investment → ID 19
   "Start up and Investment": 19,
   "start-up-and-investment": 19,
   "Startup": 19,
   "Investment": 19,
   "Entrepreneur": 19,
-
-  // Travel and Outdoors → ID 18
   "Travel and Outdoors": 18,
   "travel-and-outdoors": 18,
   "Travel": 18,
@@ -77,6 +62,17 @@ const CATEGORY_MAP: Record<string, number> = {
 function getCategoryId(category: string | null): number {
   if (!category) return 1;
   return CATEGORY_MAP[category] || 1;
+}
+
+function buildMetaDescription(caption: string | null): string {
+  if (!caption) return "";
+  return caption.slice(0, 155).trim();
+}
+
+function buildFocusKeyword(hashtags: string | null, title: string): string {
+  if (!hashtags) return title.slice(0, 50);
+  const first = hashtags.split(",")[0]?.trim().replace(/^#/, "") || title;
+  return first.slice(0, 50);
 }
 
 async function buildPostContent(
@@ -147,6 +143,11 @@ router.post("/publish/:contentId", requireAuth, async (req, res) => {
         status: "publish",
         excerpt: content.caption,
         categories: [wpCategoryId],
+        meta: {
+          _yoast_wpseo_title: content.title + " | MumDeals",
+          _yoast_wpseo_metadesc: buildMetaDescription(content.caption),
+          _yoast_wpseo_focuskw: buildFocusKeyword(content.hashtags, content.title || ""),
+        },
       }),
     });
 
@@ -213,6 +214,11 @@ router.post("/publish-all-blogs", requireAuth, async (req, res) => {
             status: "publish",
             excerpt: blog.caption,
             categories: [wpCategoryId],
+            meta: {
+              _yoast_wpseo_title: blog.title + " | MumDeals",
+              _yoast_wpseo_metadesc: buildMetaDescription(blog.caption),
+              _yoast_wpseo_focuskw: buildFocusKeyword(blog.hashtags, blog.title || ""),
+            },
           }),
         });
 
