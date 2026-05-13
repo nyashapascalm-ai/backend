@@ -189,6 +189,8 @@ Write a detailed comparison post that:
 6. Uses UK English
 7. Is SEO-optimized for the title keywords
 
+Also generate 5 FAQ questions and answers about these products that people commonly search for on Google UK.
+
 Return a JSON object with these exact fields:
 {
   "title": "${postTitle}",
@@ -196,7 +198,14 @@ Return a JSON object with these exact fields:
   "caption": "meta description under 160 chars",
   "hashtags": "keyword1, keyword2, keyword3, keyword4",
   "thumbnailPrompt": "description for featured image",
-  "cta": "compelling call to action sentence"
+  "cta": "compelling call to action sentence",
+  "faqs": [
+    {"question": "Question 1?", "answer": "Answer 1"},
+    {"question": "Question 2?", "answer": "Answer 2"},
+    {"question": "Question 3?", "answer": "Answer 3"},
+    {"question": "Question 4?", "answer": "Answer 4"},
+    {"question": "Question 5?", "answer": "Answer 5"}
+  ]
 }
 
 Return only valid JSON, no other text.`;
@@ -211,7 +220,36 @@ Return only valid JSON, no other text.`;
     const clean = text.replace(/```json|```/g, "").trim();
     const parsed = JSON.parse(clean);
 
-    // Use the first product that matches the requested category if possible
+    // Build FAQ HTML section
+    const faqHtml = parsed.faqs?.length ? `
+<div class="faq-section" style="margin-top: 32px;">
+  <h2 style="font-size: 24px; margin-bottom: 16px;">Frequently Asked Questions</h2>
+  ${parsed.faqs.map((f: any) => `
+  <div style="margin-bottom: 16px; border: 1px solid #e5e7eb; border-radius: 8px; padding: 16px;">
+    <h3 style="margin: 0 0 8px; font-size: 16px; color: #1a1a2e;">${f.question}</h3>
+    <p style="margin: 0; color: #555; line-height: 1.6;">${f.answer}</p>
+  </div>`).join("")}
+</div>` : "";
+
+    // Build FAQ schema
+    const faqSchema = parsed.faqs?.length ? `
+<script type="application/ld+json">
+{
+  "@context": "https://schema.org",
+  "@type": "FAQPage",
+  "mainEntity": [
+    ${parsed.faqs.map((f: any) => `{
+      "@type": "Question",
+      "name": "${f.question.replace(/"/g, '\\"')}",
+      "acceptedAnswer": {
+        "@type": "Answer",
+        "text": "${f.answer.replace(/"/g, '\\"')}"
+      }
+    }`).join(",")}
+  ]
+}
+</script>` : "";
+
     const categoryProduct = products.find(p => p.category === category) || products[0];
 
     const content = await prisma.content.create({
@@ -219,7 +257,7 @@ Return only valid JSON, no other text.`;
         productId: categoryProduct.id,
         type: "blog",
         title: parsed.title,
-        scriptText: parsed.scriptText,
+        scriptText: parsed.scriptText + faqHtml + faqSchema,
         caption: parsed.caption,
         hashtags: parsed.hashtags,
         thumbnailPrompt: parsed.thumbnailPrompt,
@@ -233,6 +271,7 @@ Return only valid JSON, no other text.`;
       content,
       productsCompared: products.length,
       productNames: products.map(p => p.name),
+      faqCount: parsed.faqs?.length || 0,
     });
   } catch (err: any) {
     console.error("Comparison generation error:", err?.message);
