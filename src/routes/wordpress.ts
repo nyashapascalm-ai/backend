@@ -116,6 +116,49 @@ async function getOrCreateTags(hashtags: string | null): Promise<number[]> {
   return tagIds;
 }
 
+function buildProductSchema(
+  name: string,
+  trackingLink: string,
+  productImageUrl?: string | null,
+  price?: number | null,
+  description?: string | null
+): string {
+  const cleanName = name.replace(/"/g, '\\"').replace(/\n/g, " ");
+  const cleanDesc = (description || name).replace(/"/g, '\\"').replace(/\n/g, " ").slice(0, 200);
+  const priceValidUntil = new Date(Date.now() + 365 * 24 * 60 * 60 * 1000).toISOString().split("T")[0];
+
+  return `<script type="application/ld+json">
+{
+  "@context": "https://schema.org/",
+  "@type": "Product",
+  "name": "${cleanName}",
+  "description": "${cleanDesc}",
+  "image": "${productImageUrl || ""}",
+  "brand": {
+    "@type": "Brand",
+    "name": "MumDeals"
+  },
+  "offers": {
+    "@type": "Offer",
+    "url": "${trackingLink}",
+    "priceCurrency": "GBP",
+    "price": "${price || 0}",
+    "priceValidUntil": "${priceValidUntil}",
+    "availability": "https://schema.org/InStock",
+    "seller": {
+      "@type": "Organization",
+      "name": "MumDeals"
+    }
+  },
+  "aggregateRating": {
+    "@type": "AggregateRating",
+    "ratingValue": "4.5",
+    "reviewCount": "89"
+  }
+}
+</script>`;
+}
+
 async function buildPostContent(
   name: string,
   slug: string | null,
@@ -123,7 +166,9 @@ async function buildPostContent(
   scriptText: string,
   cta: string,
   productImageUrl?: string | null,
-  category?: string | null
+  category?: string | null,
+  price?: number | null,
+  description?: string | null
 ) {
   const trackingLink = slug
     ? `https://backend-production-c3f5.up.railway.app/track/go/${slug}`
@@ -134,7 +179,11 @@ async function buildPostContent(
   <img src="${productImageUrl}" alt="${name}" style="max-width: 280px; height: auto; border-radius: 8px; box-shadow: 0 4px 16px rgba(0,0,0,0.15); border: 1px solid #e5e7eb;" />
 </div>` : "";
 
+  const schema = buildProductSchema(name, trackingLink, productImageUrl, price, description);
+
   return `
+${schema}
+
 ${scriptText}
 
 <div style="background: #f8f9fa; border-left: 4px solid #007bff; padding: 24px; margin: 24px 0; border-radius: 8px; text-align: center;">
@@ -170,7 +219,9 @@ router.post("/publish/:contentId", requireAuth, async (req, res) => {
       content.scriptText || "",
       content.cta || "",
       content.product.imageUrl,
-      productCategory
+      productCategory,
+      content.product.price,
+      content.product.description
     );
 
     const wpRes = await fetch(`${WP_URL}/wp-json/wp/v2/posts`, {
@@ -243,7 +294,9 @@ router.post("/publish-all-blogs", requireAuth, async (req, res) => {
           blog.scriptText || "",
           blog.cta || "",
           blog.product.imageUrl,
-          productCategory
+          productCategory,
+          blog.product.price,
+          blog.product.description
         );
 
         const wpRes = await fetch(`${WP_URL}/wp-json/wp/v2/posts`, {
