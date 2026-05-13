@@ -159,6 +159,18 @@ function buildProductSchema(
 </script>`;
 }
 
+function extractFaqSchema(scriptText: string): string {
+  // Extract FAQ schema from scriptText if present
+  const match = scriptText.match(/<script type="application\/ld\+json">\s*(\{[\s\S]*?"@type":\s*"FAQPage"[\s\S]*?\})\s*<\/script>/);
+  if (match) return `<script type="application/ld+json">${match[1]}</script>`;
+  return "";
+}
+
+function stripSchemaScripts(scriptText: string): string {
+  // Remove script tags from content so WordPress doesn't strip them
+  return scriptText.replace(/<script type="application\/ld\+json">[\s\S]*?<\/script>/g, "").trim();
+}
+
 async function buildPostContent(
   name: string,
   slug: string | null,
@@ -169,7 +181,7 @@ async function buildPostContent(
   category?: string | null,
   price?: number | null,
   description?: string | null
-) {
+): Promise<{ content: string; schema: string }> {
   const trackingLink = slug
     ? `https://backend-production-c3f5.up.railway.app/track/go/${slug}`
     : affiliateLink || "#";
@@ -179,12 +191,16 @@ async function buildPostContent(
   <img src="${productImageUrl}" alt="${name}" style="max-width: 280px; height: auto; border-radius: 8px; box-shadow: 0 4px 16px rgba(0,0,0,0.15); border: 1px solid #e5e7eb;" />
 </div>` : "";
 
-  const schema = buildProductSchema(name, trackingLink, productImageUrl, price, description);
+  // Extract FAQ schema and clean content
+  const faqSchema = extractFaqSchema(scriptText);
+  const productSchema = buildProductSchema(name, trackingLink, productImageUrl, price, description);
+  const cleanContent = stripSchemaScripts(scriptText);
 
-  return `
-${schema}
+  // Combine both schemas
+  const combinedSchema = productSchema + "\n" + faqSchema;
 
-${scriptText}
+  const content = `
+${cleanContent}
 
 <div style="background: #f8f9fa; border-left: 4px solid #007bff; padding: 24px; margin: 24px 0; border-radius: 8px; text-align: center;">
   <h3 style="margin: 0 0 8px; font-size: 20px;">Ready to try ${name}?</h3>
@@ -195,6 +211,8 @@ ${scriptText}
 
 <p style="font-size: 12px; color: #999;"><em>Disclosure: This post contains affiliate links. We may earn a commission at no extra cost to you.</em></p>
   `.trim();
+
+  return { content, schema: combinedSchema };
 }
 
 router.post("/publish/:contentId", requireAuth, async (req, res) => {
@@ -212,7 +230,7 @@ router.post("/publish/:contentId", requireAuth, async (req, res) => {
     const wpCategoryId = getCategoryId(productCategory, content.title);
     const tagIds = await getOrCreateTags(content.hashtags);
 
-    const postContent = await buildPostContent(
+    const { content: postContent, schema } = await buildPostContent(
       content.product.name,
       content.product.slug,
       content.product.affiliateLink,
@@ -241,6 +259,7 @@ router.post("/publish/:contentId", requireAuth, async (req, res) => {
           _yoast_wpseo_title: content.title + " | MumDeals",
           _yoast_wpseo_metadesc: buildMetaDescription(content.caption),
           _yoast_wpseo_focuskw: buildFocusKeyword(content.hashtags, content.title || ""),
+          _mumdeals_schema: schema,
         },
       }),
     });
@@ -287,7 +306,7 @@ router.post("/publish-all-blogs", requireAuth, async (req, res) => {
         const wpCategoryId = getCategoryId(productCategory, blog.title);
         const tagIds = await getOrCreateTags(blog.hashtags);
 
-        const postContent = await buildPostContent(
+        const { content: postContent, schema } = await buildPostContent(
           blog.product.name,
           blog.product.slug,
           blog.product.affiliateLink,
@@ -316,6 +335,7 @@ router.post("/publish-all-blogs", requireAuth, async (req, res) => {
               _yoast_wpseo_title: blog.title + " | MumDeals",
               _yoast_wpseo_metadesc: buildMetaDescription(blog.caption),
               _yoast_wpseo_focuskw: buildFocusKeyword(blog.hashtags, blog.title || ""),
+              _mumdeals_schema: schema,
             },
           }),
         });
