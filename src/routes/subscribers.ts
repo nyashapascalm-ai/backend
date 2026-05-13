@@ -36,24 +36,19 @@ function buildWeeklyEmailHtml(products: any[]): string {
 <!DOCTYPE html>
 <html>
 <body style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; padding: 20px; color: #333; background:#f9fafb;">
-
   <div style="text-align:center; margin-bottom:24px; background:white; padding:20px; border-radius:12px;">
     <h1 style="color:#e91e8c; font-size:28px; margin:0;">MumDeals</h1>
     <p style="color:#888; font-size:14px; margin:4px 0;">Your weekly UK deals roundup 🛍️</p>
   </div>
-
   <div style="background:white; border-radius:12px; padding:20px; margin-bottom:16px;">
     <h2 style="margin:0 0 4px; color:#1a1a2e;">This Week's Top Deals</h2>
     <p style="margin:0; color:#666; font-size:14px;">Hand-picked deals across baby, home, tech, health & more</p>
   </div>
-
   ${productCards}
-
   <div style="background:#e91e8c; border-radius:12px; padding:24px; text-align:center; margin-top:16px;">
     <h3 style="margin:0 0 8px; color:white;">Want more deals?</h3>
     <a href="https://mumdeals.co.uk" style="background:white; color:#e91e8c; padding:12px 28px; border-radius:6px; text-decoration:none; font-weight:bold; display:inline-block;">Browse All Deals →</a>
   </div>
-
   <p style="font-size:11px; color:#999; text-align:center; margin-top:20px;">
     You received this because you subscribed at mumdeals.co.uk.<br>
     <a href="https://mumdeals.co.uk" style="color:#999;">Unsubscribe</a>
@@ -61,6 +56,44 @@ function buildWeeklyEmailHtml(products: any[]): string {
 </body>
 </html>`;
 }
+
+// Permanent cron endpoint — uses CRON_SECRET not JWT token
+router.post("/cron/weekly-deals", async (req, res) => {
+  const secret = req.headers["x-cron-secret"];
+  if (secret !== process.env.CRON_SECRET) {
+    return res.status(401).json({ error: "Unauthorized" });
+  }
+  try {
+    const subscribers = await prisma.subscriber.findMany({
+      where: { status: "active" },
+    });
+    if (subscribers.length === 0) return res.json({ message: "No active subscribers." });
+
+    const products = await prisma.product.findMany({
+      where: { status: "active" },
+      orderBy: { commissionRate: "desc" },
+      take: 6,
+    });
+    if (products.length === 0) return res.json({ message: "No products found." });
+
+    const htmlContent = buildWeeklyEmailHtml(products);
+    const subject = `🛍️ This Week's Best UK Deals — ${new Date().toLocaleDateString("en-GB", { day: "numeric", month: "long" })}`;
+
+    let sent = 0;
+    let failed = 0;
+
+    for (const sub of subscribers) {
+      try {
+        await resend.emails.send({ from: FROM_EMAIL, to: sub.email, subject, html: htmlContent });
+        sent++;
+      } catch { failed++; }
+    }
+
+    res.json({ message: `Weekly deals sent to ${sent} subscribers, ${failed} failed.`, sent, failed });
+  } catch (err: any) {
+    res.status(500).json({ error: err?.message || "Failed" });
+  }
+});
 
 router.post("/subscribe", async (req, res) => {
   const { email, firstName, source } = req.body;
@@ -136,21 +169,14 @@ router.post("/send-weekly-deals", requireAuth, async (req, res) => {
     const subscribers = await prisma.subscriber.findMany({
       where: { status: "active" },
     });
+    if (subscribers.length === 0) return res.json({ message: "No active subscribers yet." });
 
-    if (subscribers.length === 0) {
-      return res.json({ message: "No active subscribers yet." });
-    }
-
-    // Pick top 6 products by commission rate
     const products = await prisma.product.findMany({
       where: { status: "active" },
       orderBy: { commissionRate: "desc" },
       take: 6,
     });
-
-    if (products.length === 0) {
-      return res.json({ message: "No products found." });
-    }
+    if (products.length === 0) return res.json({ message: "No products found." });
 
     const htmlContent = buildWeeklyEmailHtml(products);
     const subject = `🛍️ This Week's Best UK Deals — ${new Date().toLocaleDateString("en-GB", { day: "numeric", month: "long" })}`;
@@ -160,12 +186,7 @@ router.post("/send-weekly-deals", requireAuth, async (req, res) => {
 
     for (const sub of subscribers) {
       try {
-        await resend.emails.send({
-          from: FROM_EMAIL,
-          to: sub.email,
-          subject,
-          html: htmlContent,
-        });
+        await resend.emails.send({ from: FROM_EMAIL, to: sub.email, subject, html: htmlContent });
         sent++;
       } catch { failed++; }
     }
@@ -182,10 +203,7 @@ router.post("/send-deals-email", requireAuth, async (req, res) => {
     const subscribers = await prisma.subscriber.findMany({
       where: { status: "active" },
     });
-
-    if (subscribers.length === 0) {
-      return res.json({ message: "No active subscribers yet." });
-    }
+    if (subscribers.length === 0) return res.json({ message: "No active subscribers yet." });
 
     let sent = 0;
     let failed = 0;
