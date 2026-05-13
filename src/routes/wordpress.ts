@@ -145,7 +145,6 @@ async function getProductImage(
     );
     const data = await res.json();
     if (data.results?.length > 0) return data.results[0].urls.small;
-    // Fallback to category search
     const catRes = await fetch(
       `https://api.unsplash.com/search/photos?query=${encodeURIComponent(category || "product")}&per_page=1&orientation=squarish`,
       { headers: { Authorization: `Client-ID ${UNSPLASH_KEY}` } }
@@ -154,6 +153,37 @@ async function getProductImage(
     return catData.results?.[0]?.urls?.small || null;
   } catch {
     return null;
+  }
+}
+
+async function getRelatedPostLinks(categoryId: number, excludeTitle?: string): Promise<string> {
+  try {
+    const res = await fetch(
+      `${WP_URL}/wp-json/wp/v2/posts?categories=${categoryId}&per_page=10&status=publish`,
+      { headers: { Authorization: `Basic ${WP_AUTH}` } }
+    );
+    const posts = await res.json();
+    if (!Array.isArray(posts) || posts.length === 0) return "";
+
+    const related = posts
+      .filter((p: any) => p.title?.rendered !== excludeTitle)
+      .slice(0, 3);
+
+    if (related.length === 0) return "";
+
+    const links = related.map((p: any) =>
+      `<li style="margin-bottom: 8px;"><a href="${p.link}" style="color: #007bff; text-decoration: none; font-size: 15px;">${p.title?.rendered || "Related Post"}</a></li>`
+    ).join("");
+
+    return `
+<div style="background: #f0f4ff; border-radius: 8px; padding: 20px; margin: 24px 0; border-left: 4px solid #7c3aed;">
+  <h3 style="margin: 0 0 12px; font-size: 17px; color: #1a1a2e;">📖 Related Articles You Might Like</h3>
+  <ul style="margin: 0; padding-left: 20px;">
+    ${links}
+  </ul>
+</div>`;
+  } catch {
+    return "";
   }
 }
 
@@ -290,7 +320,6 @@ async function buildPostContent(
     ? `https://backend-production-c3f5.up.railway.app/track/go/${slug}`
     : affiliateLink || "#";
 
-  // Get product image — use feed image or fall back to Unsplash
   const buyBoxImageUrl = await getProductImage(productImageUrl, name, category);
 
   const productImageHtml = buyBoxImageUrl ? `
@@ -300,6 +329,7 @@ async function buildPostContent(
 
   const faqSchema = extractFaqSchema(scriptText);
   const cleanContent = stripSchemaScripts(scriptText);
+  const relatedLinks = await getRelatedPostLinks(categoryId || 1, title || name);
 
   const productSchema = buildProductSchema(name, trackingLink, buyBoxImageUrl, price, description);
   const articleSchema = buildArticleSchema(title || name, caption || description || name, buyBoxImageUrl);
@@ -309,6 +339,8 @@ async function buildPostContent(
 
   const content = `
 ${cleanContent}
+
+${relatedLinks}
 
 <div style="background: #f8f9fa; border-left: 4px solid #007bff; padding: 24px; margin: 24px 0; border-radius: 8px; text-align: center;">
   <h3 style="margin: 0 0 8px; font-size: 20px;">Ready to try ${name}?</h3>
