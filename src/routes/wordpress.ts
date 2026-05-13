@@ -60,6 +60,24 @@ const CATEGORY_MAP: Record<string, number> = {
   "Adventure": 18,
 };
 
+const CATEGORY_IMAGE_QUERIES: Record<string, string[]> = {
+  "Baby & Parenting": ["baby nursery crib", "baby toys newborn", "mother baby happy", "baby clothes products"],
+  "Parenting": ["baby nursery crib", "mother baby happy", "baby products"],
+  "Furniture": ["nursery furniture baby room", "baby crib bedroom"],
+  "Home & Garden": ["home interior living room", "garden flowers", "home decor lifestyle"],
+  "Home Office": ["home office desk workspace", "laptop working from home"],
+  "Bedding": ["bedroom bedding pillows", "cozy bed sheets"],
+  "Pet Care": ["dog pet happy", "cat pet lifestyle", "pet products"],
+  "Health & Wellness": ["health wellness spa", "yoga fitness wellness", "beauty skincare"],
+  "Beauty": ["beauty skincare products", "makeup cosmetics"],
+  "Fitness": ["gym fitness workout", "running exercise healthy"],
+  "Tech & AI Tools": ["technology laptop modern", "smartphone tech gadget"],
+  "Finance and Insurance": ["finance money savings", "insurance protection family"],
+  "Travel and Outdoors": ["travel adventure nature", "outdoor hiking landscape"],
+  "Start up and Investment": ["business startup entrepreneur", "investment growth success"],
+  "Fashion": ["fashion clothing style", "outfit lifestyle"],
+};
+
 function getCategoryId(category: string | null, title?: string | null): number {
   if (title) {
     const t = title.toLowerCase();
@@ -138,19 +156,21 @@ async function getProductImage(
 ): Promise<string | null> {
   if (productImageUrl) return productImageUrl;
   try {
-    const query = name.split(" ").slice(0, 4).join(" ");
+    // Get relevant queries for this category
+    const queries = CATEGORY_IMAGE_QUERIES[category || ""] || ["lifestyle shopping product"];
+    // Pick a random query from the list for variety
+    const query = queries[Math.floor(Math.random() * queries.length)];
+
     const res = await fetch(
-      `https://api.unsplash.com/search/photos?query=${encodeURIComponent(query)}&per_page=1&orientation=squarish`,
+      `https://api.unsplash.com/search/photos?query=${encodeURIComponent(query)}&per_page=10&orientation=squarish`,
       { headers: { Authorization: `Client-ID ${UNSPLASH_KEY}` } }
     );
     const data = await res.json();
-    if (data.results?.length > 0) return data.results[0].urls.small;
-    const catRes = await fetch(
-      `https://api.unsplash.com/search/photos?query=${encodeURIComponent(category || "product")}&per_page=1&orientation=squarish`,
-      { headers: { Authorization: `Client-ID ${UNSPLASH_KEY}` } }
-    );
-    const catData = await catRes.json();
-    return catData.results?.[0]?.urls?.small || null;
+    if (data.results?.length > 0) {
+      const random = data.results[Math.floor(Math.random() * Math.min(5, data.results.length))];
+      return random.urls.small;
+    }
+    return null;
   } catch {
     return null;
   }
@@ -429,7 +449,6 @@ router.post("/publish-all-blogs", requireAuth, async (req, res) => {
       take: 50,
     });
 
-    // Use content ID not productId to allow multiple posts per product
     const alreadyPublished = await prisma.content.findMany({
       where: { type: "blog", status: "published" },
       select: { id: true },
