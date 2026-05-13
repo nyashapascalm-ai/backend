@@ -59,9 +59,22 @@ const CATEGORY_MAP: Record<string, number> = {
   "Adventure": 18,
 };
 
-function getCategoryId(category: string | null): number {
-  if (!category) return 1;
-  return CATEGORY_MAP[category] || 1;
+function getCategoryId(category: string | null, title?: string | null): number {
+  if (category && CATEGORY_MAP[category]) return CATEGORY_MAP[category];
+
+  if (title) {
+    const t = title.toLowerCase();
+    if (t.includes("baby") || t.includes("nursery") || t.includes("sleeping bag") || t.includes("pram") || t.includes("carrier") || t.includes("parenting") || t.includes("toddler") || t.includes("newborn")) return 1;
+    if (t.includes("tyre") || t.includes("tire") || t.includes("flower") || t.includes("home") || t.includes("garden") || t.includes("bedding") || t.includes("kitchen") || t.includes("bedroom") || t.includes("sofa")) return 5;
+    if (t.includes("pet") || t.includes("dog") || t.includes("cat")) return 6;
+    if (t.includes("health") || t.includes("wellness") || t.includes("fitness") || t.includes("beauty") || t.includes("hair") || t.includes("ipl")) return 7;
+    if (t.includes("tech") || t.includes("ai") || t.includes("software") || t.includes("broadband") || t.includes("internet") || t.includes("tool")) return 8;
+    if (t.includes("travel insurance") || t.includes("cover") || t.includes("finance") || t.includes("insurance") || t.includes("money")) return 17;
+    if (t.includes("iso") || t.includes("training") || t.includes("startup") || t.includes("business") || t.includes("entrepreneur") || t.includes("investment")) return 19;
+    if (t.includes("travel") || t.includes("outdoor") || t.includes("holiday") || t.includes("ticket") || t.includes("theatre") || t.includes("adventure")) return 18;
+  }
+
+  return 1;
 }
 
 function buildMetaDescription(caption: string | null): string {
@@ -119,7 +132,7 @@ router.post("/publish/:contentId", requireAuth, async (req, res) => {
     if (content.status === "published") return res.status(400).json({ error: "Already published" });
 
     const productCategory = content.product.category || "";
-    const wpCategoryId = getCategoryId(productCategory);
+    const wpCategoryId = getCategoryId(productCategory, content.title);
 
     const postContent = await buildPostContent(
       content.product.name,
@@ -190,7 +203,7 @@ router.post("/publish-all-blogs", requireAuth, async (req, res) => {
     for (const blog of toPublish) {
       try {
         const productCategory = blog.product.category || "";
-        const wpCategoryId = getCategoryId(productCategory);
+        const wpCategoryId = getCategoryId(productCategory, blog.title);
 
         const postContent = await buildPostContent(
           blog.product.name,

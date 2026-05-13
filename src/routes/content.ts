@@ -14,6 +14,7 @@ async function generateForProduct(productId: number, type: string, anthropic: An
     "AI Tools": "Target audience: entrepreneurs, content creators, and tech-savvy professionals who want to save time and boost productivity.",
     "Tech & AI Tools": "Target audience: entrepreneurs and tech professionals. Use language around productivity, ROI, automation, and competitive advantage.",
     "Finance": "Target audience: people wanting financial freedom or better money management.",
+    "Finance and Insurance": "Target audience: people wanting financial freedom, better money management or travel protection.",
     "Fitness": "Target audience: people wanting to lose weight, build muscle, or improve health.",
     "Health": "Target audience: health-conscious people wanting to feel better.",
     "Health & Wellness": "Target audience: health-conscious people wanting to feel better and live longer.",
@@ -28,6 +29,8 @@ async function generateForProduct(productId: number, type: string, anthropic: An
     "Baby & Parenting": "Target audience: parents wanting the best for their children. Use language around safety, development, joy, and making memories.",
     "Furniture": "Target audience: parents setting up a nursery or home. Use language around safety, quality, and value.",
     "Pet Care": "Target audience: pet owners who treat their pets like family.",
+    "Travel and Outdoors": "Target audience: adventure seekers and families wanting to explore the world.",
+    "Start up and Investment": "Target audience: entrepreneurs and investors wanting to grow their wealth and business.",
   };
 
   const audienceContext = nicheContext[niche] || "Target a broad audience interested in quality products.";
@@ -133,7 +136,6 @@ router.post("/generate-comparison", requireAuth, async (req, res) => {
         where: { id: { in: productIds }, status: "active" },
       });
     } else {
-      // Try with category + price filter first
       products = await prisma.product.findMany({
         where: {
           status: "active",
@@ -143,7 +145,6 @@ router.post("/generate-comparison", requireAuth, async (req, res) => {
         take: 8,
       });
 
-      // Fallback: try category only (ignore price filter)
       if (products.length < 2 && maxPrice) {
         products = await prisma.product.findMany({
           where: {
@@ -154,7 +155,6 @@ router.post("/generate-comparison", requireAuth, async (req, res) => {
         });
       }
 
-      // Final fallback: get any active products
       if (products.length < 2) {
         products = await prisma.product.findMany({
           where: { status: "active" },
@@ -211,9 +211,12 @@ Return only valid JSON, no other text.`;
     const clean = text.replace(/```json|```/g, "").trim();
     const parsed = JSON.parse(clean);
 
+    // Use the first product that matches the requested category if possible
+    const categoryProduct = products.find(p => p.category === category) || products[0];
+
     const content = await prisma.content.create({
       data: {
-        productId: products[0].id,
+        productId: categoryProduct.id,
         type: "blog",
         title: parsed.title,
         scriptText: parsed.scriptText,
