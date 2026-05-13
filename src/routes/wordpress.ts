@@ -75,6 +75,20 @@ function getCategoryId(category: string | null, title?: string | null): number {
   return 1;
 }
 
+function getCategoryName(categoryId: number): string {
+  const names: Record<number, string> = {
+    1: "Baby & Parenting",
+    5: "Home & Garden",
+    6: "Pet Care",
+    7: "Health & Wellness",
+    8: "Tech & AI Tools",
+    17: "Finance and Insurance",
+    18: "Travel and Outdoors",
+    19: "Start up and Investment",
+  };
+  return names[categoryId] || "Deals";
+}
+
 function buildMetaDescription(caption: string | null): string {
   if (!caption) return "";
   return caption.slice(0, 155).trim();
@@ -126,7 +140,6 @@ function buildProductSchema(
   const cleanName = name.replace(/"/g, '\\"').replace(/\n/g, " ");
   const cleanDesc = (description || name).replace(/"/g, '\\"').replace(/\n/g, " ").slice(0, 200);
   const priceValidUntil = new Date(Date.now() + 365 * 24 * 60 * 60 * 1000).toISOString().split("T")[0];
-
   return `<script type="application/ld+json">
 {
   "@context": "https://schema.org/",
@@ -134,10 +147,7 @@ function buildProductSchema(
   "name": "${cleanName}",
   "description": "${cleanDesc}",
   "image": "${productImageUrl || ""}",
-  "brand": {
-    "@type": "Brand",
-    "name": "MumDeals"
-  },
+  "brand": { "@type": "Brand", "name": "MumDeals" },
   "offers": {
     "@type": "Offer",
     "url": "${trackingLink}",
@@ -145,10 +155,7 @@ function buildProductSchema(
     "price": "${price || 0}",
     "priceValidUntil": "${priceValidUntil}",
     "availability": "https://schema.org/InStock",
-    "seller": {
-      "@type": "Organization",
-      "name": "MumDeals"
-    }
+    "seller": { "@type": "Organization", "name": "MumDeals" }
   },
   "aggregateRating": {
     "@type": "AggregateRating",
@@ -159,15 +166,85 @@ function buildProductSchema(
 </script>`;
 }
 
+function buildArticleSchema(
+  title: string,
+  description: string,
+  productImageUrl?: string | null
+): string {
+  const cleanTitle = title.replace(/"/g, '\\"').replace(/\n/g, " ");
+  const cleanDesc = description.replace(/"/g, '\\"').replace(/\n/g, " ").slice(0, 200);
+  const datePublished = new Date().toISOString();
+  return `<script type="application/ld+json">
+{
+  "@context": "https://schema.org",
+  "@type": "Article",
+  "headline": "${cleanTitle}",
+  "description": "${cleanDesc}",
+  "image": "${productImageUrl || "https://mumdeals.co.uk/wp-content/uploads/2026/05/mumdeals_logo_v3.svg"}",
+  "author": {
+    "@type": "Organization",
+    "name": "MumDeals",
+    "url": "https://mumdeals.co.uk"
+  },
+  "publisher": {
+    "@type": "Organization",
+    "name": "MumDeals",
+    "logo": {
+      "@type": "ImageObject",
+      "url": "https://mumdeals.co.uk/wp-content/uploads/2026/05/mumdeals_logo_v3.svg"
+    }
+  },
+  "datePublished": "${datePublished}",
+  "dateModified": "${datePublished}",
+  "mainEntityOfPage": {
+    "@type": "WebPage",
+    "@id": "https://mumdeals.co.uk"
+  }
+}
+</script>`;
+}
+
+function buildBreadcrumbSchema(
+  title: string,
+  categoryId: number
+): string {
+  const categoryName = getCategoryName(categoryId);
+  const categorySlug = categoryName.toLowerCase().replace(/\s+/g, "-").replace(/&/g, "").replace(/--/g, "-");
+  return `<script type="application/ld+json">
+{
+  "@context": "https://schema.org",
+  "@type": "BreadcrumbList",
+  "itemListElement": [
+    {
+      "@type": "ListItem",
+      "position": 1,
+      "name": "Home",
+      "item": "https://mumdeals.co.uk"
+    },
+    {
+      "@type": "ListItem",
+      "position": 2,
+      "name": "${categoryName}",
+      "item": "https://mumdeals.co.uk/category/${categorySlug}/"
+    },
+    {
+      "@type": "ListItem",
+      "position": 3,
+      "name": "${title.replace(/"/g, '\\"')}",
+      "item": "https://mumdeals.co.uk"
+    }
+  ]
+}
+</script>`;
+}
+
 function extractFaqSchema(scriptText: string): string {
-  // Extract FAQ schema from scriptText if present
   const match = scriptText.match(/<script type="application\/ld\+json">\s*(\{[\s\S]*?"@type":\s*"FAQPage"[\s\S]*?\})\s*<\/script>/);
   if (match) return `<script type="application/ld+json">${match[1]}</script>`;
   return "";
 }
 
 function stripSchemaScripts(scriptText: string): string {
-  // Remove script tags from content so WordPress doesn't strip them
   return scriptText.replace(/<script type="application\/ld\+json">[\s\S]*?<\/script>/g, "").trim();
 }
 
@@ -180,7 +257,10 @@ async function buildPostContent(
   productImageUrl?: string | null,
   category?: string | null,
   price?: number | null,
-  description?: string | null
+  description?: string | null,
+  title?: string | null,
+  caption?: string | null,
+  categoryId?: number
 ): Promise<{ content: string; schema: string }> {
   const trackingLink = slug
     ? `https://backend-production-c3f5.up.railway.app/track/go/${slug}`
@@ -191,13 +271,14 @@ async function buildPostContent(
   <img src="${productImageUrl}" alt="${name}" style="max-width: 280px; height: auto; border-radius: 8px; box-shadow: 0 4px 16px rgba(0,0,0,0.15); border: 1px solid #e5e7eb;" />
 </div>` : "";
 
-  // Extract FAQ schema and clean content
   const faqSchema = extractFaqSchema(scriptText);
-  const productSchema = buildProductSchema(name, trackingLink, productImageUrl, price, description);
   const cleanContent = stripSchemaScripts(scriptText);
 
-  // Combine both schemas
-  const combinedSchema = productSchema + "\n" + faqSchema;
+  const productSchema = buildProductSchema(name, trackingLink, productImageUrl, price, description);
+  const articleSchema = buildArticleSchema(title || name, caption || description || name, productImageUrl);
+  const breadcrumbSchema = buildBreadcrumbSchema(title || name, categoryId || 1);
+
+  const combinedSchema = [productSchema, articleSchema, breadcrumbSchema, faqSchema].filter(Boolean).join("\n");
 
   const content = `
 ${cleanContent}
@@ -239,7 +320,10 @@ router.post("/publish/:contentId", requireAuth, async (req, res) => {
       content.product.imageUrl,
       productCategory,
       content.product.price,
-      content.product.description
+      content.product.description,
+      content.title,
+      content.caption,
+      wpCategoryId
     );
 
     const wpRes = await fetch(`${WP_URL}/wp-json/wp/v2/posts`, {
@@ -315,7 +399,10 @@ router.post("/publish-all-blogs", requireAuth, async (req, res) => {
           blog.product.imageUrl,
           productCategory,
           blog.product.price,
-          blog.product.description
+          blog.product.description,
+          blog.title,
+          blog.caption,
+          wpCategoryId
         );
 
         const wpRes = await fetch(`${WP_URL}/wp-json/wp/v2/posts`, {
