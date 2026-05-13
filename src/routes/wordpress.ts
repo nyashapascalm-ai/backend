@@ -164,17 +164,13 @@ async function getRelatedPostLinks(categoryId: number, excludeTitle?: string): P
     );
     const posts = await res.json();
     if (!Array.isArray(posts) || posts.length === 0) return "";
-
     const related = posts
       .filter((p: any) => p.title?.rendered !== excludeTitle)
       .slice(0, 3);
-
     if (related.length === 0) return "";
-
     const links = related.map((p: any) =>
       `<li style="margin-bottom: 8px;"><a href="${p.link}" style="color: #007bff; text-decoration: none; font-size: 15px;">${p.title?.rendered || "Related Post"}</a></li>`
     ).join("");
-
     return `
 <div style="background: #f0f4ff; border-radius: 8px; padding: 20px; margin: 24px 0; border-left: 4px solid #7c3aed;">
   <h3 style="margin: 0 0 12px; font-size: 17px; color: #1a1a2e;">📖 Related Articles You Might Like</h3>
@@ -433,12 +429,13 @@ router.post("/publish-all-blogs", requireAuth, async (req, res) => {
       take: 50,
     });
 
+    // Use content ID not productId to allow multiple posts per product
     const alreadyPublished = await prisma.content.findMany({
       where: { type: "blog", status: "published" },
-      select: { productId: true },
+      select: { id: true },
     });
-    const publishedProductIds = new Set(alreadyPublished.map(c => c.productId));
-    const toPublish = blogs.filter(b => !publishedProductIds.has(b.productId));
+    const publishedIds = new Set(alreadyPublished.map(c => c.id));
+    const toPublish = blogs.filter(b => !publishedIds.has(b.id));
     const skipped = blogs.length - toPublish.length;
 
     const results = { published: 0, failed: 0, skipped, urls: [] as string[], categories: [] as string[] };
