@@ -8,6 +8,7 @@ const WP_URL = process.env.WP_URL || "https://mumdeals.co.uk";
 const WP_USER = process.env.WP_USER || "nyashapascalm@gmail.com";
 const WP_PASSWORD = process.env.WP_PASSWORD || "oRg4 U5w3 Ie3C u2ej daxP n7kv";
 const WP_AUTH = Buffer.from(`${WP_USER}:${WP_PASSWORD}`).toString("base64");
+const UNSPLASH_KEY = process.env.UNSPLASH_ACCESS_KEY || "DrUS0sg423xsPqZzrJCZ7fXUX4oq6Yc9kGTKVTgszw0";
 
 const CATEGORY_MAP: Record<string, number> = {
   "Baby & Parenting": 1,
@@ -130,6 +131,32 @@ async function getOrCreateTags(hashtags: string | null): Promise<number[]> {
   return tagIds;
 }
 
+async function getProductImage(
+  productImageUrl: string | null | undefined,
+  name: string,
+  category: string | null | undefined
+): Promise<string | null> {
+  if (productImageUrl) return productImageUrl;
+  try {
+    const query = name.split(" ").slice(0, 4).join(" ");
+    const res = await fetch(
+      `https://api.unsplash.com/search/photos?query=${encodeURIComponent(query)}&per_page=1&orientation=squarish`,
+      { headers: { Authorization: `Client-ID ${UNSPLASH_KEY}` } }
+    );
+    const data = await res.json();
+    if (data.results?.length > 0) return data.results[0].urls.small;
+    // Fallback to category search
+    const catRes = await fetch(
+      `https://api.unsplash.com/search/photos?query=${encodeURIComponent(category || "product")}&per_page=1&orientation=squarish`,
+      { headers: { Authorization: `Client-ID ${UNSPLASH_KEY}` } }
+    );
+    const catData = await catRes.json();
+    return catData.results?.[0]?.urls?.small || null;
+  } catch {
+    return null;
+  }
+}
+
 function buildProductSchema(
   name: string,
   trackingLink: string,
@@ -204,10 +231,7 @@ function buildArticleSchema(
 </script>`;
 }
 
-function buildBreadcrumbSchema(
-  title: string,
-  categoryId: number
-): string {
+function buildBreadcrumbSchema(title: string, categoryId: number): string {
   const categoryName = getCategoryName(categoryId);
   const categorySlug = categoryName.toLowerCase().replace(/\s+/g, "-").replace(/&/g, "").replace(/--/g, "-");
   return `<script type="application/ld+json">
@@ -266,16 +290,19 @@ async function buildPostContent(
     ? `https://backend-production-c3f5.up.railway.app/track/go/${slug}`
     : affiliateLink || "#";
 
-  const productImageHtml = productImageUrl ? `
+  // Get product image — use feed image or fall back to Unsplash
+  const buyBoxImageUrl = await getProductImage(productImageUrl, name, category);
+
+  const productImageHtml = buyBoxImageUrl ? `
 <div style="text-align: center; margin: 16px 0;">
-  <img src="${productImageUrl}" alt="${name}" style="max-width: 280px; height: auto; border-radius: 8px; box-shadow: 0 4px 16px rgba(0,0,0,0.15); border: 1px solid #e5e7eb;" />
+  <img src="${buyBoxImageUrl}" alt="${name}" style="max-width: 280px; height: auto; border-radius: 8px; box-shadow: 0 4px 16px rgba(0,0,0,0.15); border: 1px solid #e5e7eb;" />
 </div>` : "";
 
   const faqSchema = extractFaqSchema(scriptText);
   const cleanContent = stripSchemaScripts(scriptText);
 
-  const productSchema = buildProductSchema(name, trackingLink, productImageUrl, price, description);
-  const articleSchema = buildArticleSchema(title || name, caption || description || name, productImageUrl);
+  const productSchema = buildProductSchema(name, trackingLink, buyBoxImageUrl, price, description);
+  const articleSchema = buildArticleSchema(title || name, caption || description || name, buyBoxImageUrl);
   const breadcrumbSchema = buildBreadcrumbSchema(title || name, categoryId || 1);
 
   const combinedSchema = [productSchema, articleSchema, breadcrumbSchema, faqSchema].filter(Boolean).join("\n");
