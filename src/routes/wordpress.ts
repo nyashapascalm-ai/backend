@@ -60,19 +60,21 @@ const CATEGORY_MAP: Record<string, number> = {
 };
 
 function getCategoryId(category: string | null, title?: string | null): number {
-  if (category && CATEGORY_MAP[category]) return CATEGORY_MAP[category];
-
+  // Check title keywords FIRST for better accuracy on comparison posts
   if (title) {
     const t = title.toLowerCase();
-    if (t.includes("baby") || t.includes("nursery") || t.includes("sleeping bag") || t.includes("pram") || t.includes("carrier") || t.includes("parenting") || t.includes("toddler") || t.includes("newborn")) return 1;
-    if (t.includes("tyre") || t.includes("tire") || t.includes("flower") || t.includes("home") || t.includes("garden") || t.includes("bedding") || t.includes("kitchen") || t.includes("bedroom") || t.includes("sofa")) return 5;
-    if (t.includes("pet") || t.includes("dog") || t.includes("cat")) return 6;
-    if (t.includes("health") || t.includes("wellness") || t.includes("fitness") || t.includes("beauty") || t.includes("hair") || t.includes("ipl")) return 7;
-    if (t.includes("tech") || t.includes("ai") || t.includes("software") || t.includes("broadband") || t.includes("internet") || t.includes("tool")) return 8;
-    if (t.includes("travel insurance") || t.includes("cover") || t.includes("finance") || t.includes("insurance") || t.includes("money")) return 17;
-    if (t.includes("iso") || t.includes("training") || t.includes("startup") || t.includes("business") || t.includes("entrepreneur") || t.includes("investment")) return 19;
-    if (t.includes("travel") || t.includes("outdoor") || t.includes("holiday") || t.includes("ticket") || t.includes("theatre") || t.includes("adventure")) return 18;
+    if (t.includes("baby") || t.includes("nursery") || t.includes("sleeping bag") || t.includes("pram") || t.includes("carrier") || t.includes("parenting") || t.includes("toddler") || t.includes("newborn") || t.includes("monitor") || t.includes("nappy") || t.includes("pushchair")) return 1;
+    if (t.includes("tyre") || t.includes("tire") || t.includes("flower") || t.includes("sofa") || t.includes("home office") || t.includes("bedding") || t.includes("kitchen") || t.includes("bedroom") || t.includes("home garden") || t.includes("garden tool")) return 5;
+    if (t.includes("pet") || t.includes("dog") || t.includes("cat") || t.includes("puppy") || t.includes("kitten")) return 6;
+    if (t.includes("health") || t.includes("wellness") || t.includes("fitness") || t.includes("beauty") || t.includes("hair removal") || t.includes("ipl") || t.includes("weight loss")) return 7;
+    if (t.includes("broadband") || t.includes("internet") || t.includes("ai tool") || t.includes("software tool") || t.includes("tech gadget")) return 8;
+    if (t.includes("travel insurance") || t.includes("cover for") || t.includes("life insurance") || t.includes("car insurance") || t.includes("finance") || t.includes("insurance")) return 17;
+    if (t.includes("iso") || t.includes("certification") || t.includes("startup") || t.includes("entrepreneur") || t.includes("investment") || t.includes("business course")) return 19;
+    if (t.includes("travel") || t.includes("outdoor") || t.includes("holiday") || t.includes("theatre ticket") || t.includes("adventure") || t.includes("hiking")) return 18;
   }
+
+  // Fall back to product category map
+  if (category && CATEGORY_MAP[category]) return CATEGORY_MAP[category];
 
   return 1;
 }
