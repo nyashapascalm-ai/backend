@@ -60,7 +60,6 @@ const CATEGORY_MAP: Record<string, number> = {
 };
 
 function getCategoryId(category: string | null, title?: string | null): number {
-  // Check title keywords FIRST for better accuracy on comparison posts
   if (title) {
     const t = title.toLowerCase();
     if (t.includes("baby") || t.includes("nursery") || t.includes("sleeping bag") || t.includes("pram") || t.includes("carrier") || t.includes("parenting") || t.includes("toddler") || t.includes("newborn") || t.includes("monitor") || t.includes("nappy") || t.includes("pushchair")) return 1;
@@ -72,10 +71,7 @@ function getCategoryId(category: string | null, title?: string | null): number {
     if (t.includes("iso") || t.includes("certification") || t.includes("startup") || t.includes("entrepreneur") || t.includes("investment") || t.includes("business course")) return 19;
     if (t.includes("travel") || t.includes("outdoor") || t.includes("holiday") || t.includes("theatre ticket") || t.includes("adventure") || t.includes("hiking")) return 18;
   }
-
-  // Fall back to product category map
   if (category && CATEGORY_MAP[category]) return CATEGORY_MAP[category];
-
   return 1;
 }
 
@@ -88,6 +84,36 @@ function buildFocusKeyword(hashtags: string | null, title: string): string {
   if (!hashtags) return title.slice(0, 50);
   const first = hashtags.split(",")[0]?.trim().replace(/^#/, "") || title;
   return first.slice(0, 50);
+}
+
+async function getOrCreateTags(hashtags: string | null): Promise<number[]> {
+  if (!hashtags) return [];
+  const tagNames = hashtags.split(",").map(t => t.trim().replace(/^#/, "")).filter(Boolean).slice(0, 5);
+  const tagIds: number[] = [];
+  for (const name of tagNames) {
+    try {
+      const searchRes = await fetch(
+        `${WP_URL}/wp-json/wp/v2/tags?search=${encodeURIComponent(name)}&per_page=1`,
+        { headers: { Authorization: `Basic ${WP_AUTH}` } }
+      );
+      const existing = await searchRes.json();
+      if (Array.isArray(existing) && existing.length > 0) {
+        tagIds.push(existing[0].id);
+      } else {
+        const createRes = await fetch(`${WP_URL}/wp-json/wp/v2/tags`, {
+          method: "POST",
+          headers: {
+            Authorization: `Basic ${WP_AUTH}`,
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify({ name }),
+        });
+        const created = await createRes.json();
+        if (created.id) tagIds.push(created.id);
+      }
+    } catch { continue; }
+  }
+  return tagIds;
 }
 
 async function buildPostContent(
@@ -135,6 +161,7 @@ router.post("/publish/:contentId", requireAuth, async (req, res) => {
 
     const productCategory = content.product.category || "";
     const wpCategoryId = getCategoryId(productCategory, content.title);
+    const tagIds = await getOrCreateTags(content.hashtags);
 
     const postContent = await buildPostContent(
       content.product.name,
@@ -158,6 +185,7 @@ router.post("/publish/:contentId", requireAuth, async (req, res) => {
         status: "publish",
         excerpt: content.caption,
         categories: [wpCategoryId],
+        tags: tagIds,
         meta: {
           _yoast_wpseo_title: content.title + " | MumDeals",
           _yoast_wpseo_metadesc: buildMetaDescription(content.caption),
@@ -177,7 +205,7 @@ router.post("/publish/:contentId", requireAuth, async (req, res) => {
       data: { status: "published", postUrl: wpPost.link },
     });
 
-    res.json({ message: "Published!", postUrl: wpPost.link, postId: wpPost.id, category: productCategory, wpCategoryId });
+    res.json({ message: "Published!", postUrl: wpPost.link, postId: wpPost.id, category: productCategory, wpCategoryId, tags: tagIds.length });
   } catch (err: any) {
     console.error("WordPress error:", err?.message);
     res.status(500).json({ error: err?.message || "Failed to publish" });
@@ -206,6 +234,7 @@ router.post("/publish-all-blogs", requireAuth, async (req, res) => {
       try {
         const productCategory = blog.product.category || "";
         const wpCategoryId = getCategoryId(productCategory, blog.title);
+        const tagIds = await getOrCreateTags(blog.hashtags);
 
         const postContent = await buildPostContent(
           blog.product.name,
@@ -229,6 +258,7 @@ router.post("/publish-all-blogs", requireAuth, async (req, res) => {
             status: "publish",
             excerpt: blog.caption,
             categories: [wpCategoryId],
+            tags: tagIds,
             meta: {
               _yoast_wpseo_title: blog.title + " | MumDeals",
               _yoast_wpseo_metadesc: buildMetaDescription(blog.caption),
