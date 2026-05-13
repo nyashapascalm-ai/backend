@@ -54,3 +54,12 @@ model Click {
   createdAt DateTime @default(now())
   product   Product  @relation(fields: [productId], references: [id])
 }
+
+model Subscriber {
+  id        Int      @id @default(autoincrement())
+  email     String   @unique
+  firstName String?
+  status    String   @default("active")
+  source    String?
+  createdAt DateTime @default(now())
+}

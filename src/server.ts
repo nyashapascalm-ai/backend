@@ -12,6 +12,7 @@ import awinRouter from './routes/awin.ts';
 import wordpressRouter from './routes/wordpress.ts';
 import pinterestRouter from './routes/pinterest.ts';
 import imagesRouter from './routes/images.ts';
+import subscribersRouter from './routes/subscribers.ts';
 
 const app = express();
 app.use(cors());
@@ -37,6 +38,7 @@ app.use('/awin', awinRouter);
 app.use('/wordpress', wordpressRouter);
 app.use('/pinterest', pinterestRouter);
 app.use('/images', imagesRouter);
+app.use('/', subscribersRouter);
 
 const PORT = process.env.PORT || 3000;
 app.listen(PORT, () => {
