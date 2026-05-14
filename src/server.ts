@@ -14,6 +14,7 @@ import pinterestRouter from './routes/pinterest.ts';
 import imagesRouter from './routes/images.ts';
 import subscribersRouter from './routes/subscribers.ts';
 import sponsoredRouter from './routes/sponsored.ts';
+import refreshRouter from './routes/refresh.ts';
 
 const app = express();
 app.use(cors());
@@ -41,6 +42,7 @@ app.use('/pinterest', pinterestRouter);
 app.use('/images', imagesRouter);
 app.use('/', subscribersRouter);
 app.use('/', sponsoredRouter);
+app.use('/', refreshRouter);
 
 const PORT = process.env.PORT || 3000;
 app.listen(PORT, () => {
