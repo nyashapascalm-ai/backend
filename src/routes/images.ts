@@ -71,7 +71,6 @@ async function searchUnsplashImage(
     );
     const data = await res.json();
     if (!data.results?.length) return null;
-
     for (const photo of data.results) {
       if (!usedUrls.has(photo.urls.regular)) {
         return {
@@ -114,15 +113,10 @@ async function uploadImageToWordPress(
       throw new Error(err.message || "Media upload failed");
     }
     const media = await wpRes.json();
-
     const attribution = `Photo by <a href="https://unsplash.com/@${photographerUsername}?utm_source=mumdeals&utm_medium=referral">${photographer}</a> on <a href="https://unsplash.com/?utm_source=mumdeals&utm_medium=referral">Unsplash</a>`;
-
     await fetch(`${WP_URL}/wp-json/wp/v2/media/${media.id}`, {
       method: "POST",
-      headers: {
-        Authorization: `Basic ${WP_AUTH}`,
-        "Content-Type": "application/json",
-      },
+      headers: { Authorization: `Basic ${WP_AUTH}`, "Content-Type": "application/json" },
       body: JSON.stringify({ alt_text: title, caption: attribution }),
     });
     return media.id;
@@ -136,10 +130,7 @@ async function setFeaturedImage(postId: number, mediaId: number): Promise<boolea
   try {
     const res = await fetch(`${WP_URL}/wp-json/wp/v2/posts/${postId}`, {
       method: "POST",
-      headers: {
-        Authorization: `Basic ${WP_AUTH}`,
-        "Content-Type": "application/json",
-      },
+      headers: { Authorization: `Basic ${WP_AUTH}`, "Content-Type": "application/json" },
       body: JSON.stringify({ featured_media: mediaId }),
     });
     return res.ok;
@@ -158,7 +149,6 @@ router.post("/fix-post-urls", requireAuth, async (req, res) => {
     const published = await prisma.content.findMany({
       where: { type: "blog", status: "published" },
     });
-
     let fixed = 0;
     for (const content of published) {
       if (content.postUrl?.includes("hostingersite.com")) {
@@ -166,21 +156,44 @@ router.post("/fix-post-urls", requireAuth, async (req, res) => {
           "https://hotpink-jay-474959.hostingersite.com",
           "https://mumdeals.co.uk"
         );
-        await prisma.content.update({
-          where: { id: content.id },
-          data: { postUrl: newUrl },
-        });
+        await prisma.content.update({ where: { id: content.id }, data: { postUrl: newUrl } });
         fixed++;
       }
     }
-
-    res.json({
-      message: `Fixed ${fixed} post URLs from hostingersite.com to mumdeals.co.uk`,
-      fixed,
-      total: published.length,
-    });
+    res.json({ message: `Fixed ${fixed} post URLs.`, fixed, total: published.length });
   } catch (err: any) {
     res.status(500).json({ error: err?.message || "Failed to fix URLs" });
+  }
+});
+
+router.post("/reset-featured-images", requireAuth, async (req, res) => {
+  try {
+    const wpRes1 = await fetch(`${WP_URL}/wp-json/wp/v2/posts?per_page=100&page=1`, {
+      headers: { Authorization: `Basic ${WP_AUTH}` },
+    });
+    const wpRes2 = await fetch(`${WP_URL}/wp-json/wp/v2/posts?per_page=100&page=2`, {
+      headers: { Authorization: `Basic ${WP_AUTH}` },
+    });
+    const posts1 = await wpRes1.json();
+    const posts2 = wpRes2.ok ? await wpRes2.json() : [];
+    const allPosts = [
+      ...(Array.isArray(posts1) ? posts1 : []),
+      ...(Array.isArray(posts2) ? posts2 : []),
+    ];
+    let reset = 0;
+    for (const post of allPosts) {
+      if (post.featured_media && post.featured_media > 0) {
+        await fetch(`${WP_URL}/wp-json/wp/v2/posts/${post.id}`, {
+          method: "POST",
+          headers: { Authorization: `Basic ${WP_AUTH}`, "Content-Type": "application/json" },
+          body: JSON.stringify({ featured_media: 0 }),
+        });
+        reset++;
+      }
+    }
+    res.json({ message: `Reset featured images on ${reset} posts. Now run add-featured-images.`, reset });
+  } catch (err: any) {
+    res.status(500).json({ error: err?.message || "Failed to reset" });
   }
 });
 
@@ -190,71 +203,46 @@ router.post("/add-featured-images", requireAuth, async (req, res) => {
       where: { type: "blog", status: "published" },
       include: { product: true },
     });
-
     const results = { updated: 0, failed: 0, skipped: 0 };
     const usedImageUrls = new Set<string>();
-
     const wpRes1 = await fetch(`${WP_URL}/wp-json/wp/v2/posts?per_page=100&orderby=date&order=desc&page=1`, {
       headers: { Authorization: `Basic ${WP_AUTH}` },
     });
     const wpPosts1 = await wpRes1.json();
-
     const wpRes2 = await fetch(`${WP_URL}/wp-json/wp/v2/posts?per_page=100&orderby=date&order=desc&page=2`, {
       headers: { Authorization: `Basic ${WP_AUTH}` },
     });
     const wpPosts2 = wpRes2.ok ? await wpRes2.json() : [];
-
     const wpPosts = [
       ...(Array.isArray(wpPosts1) ? wpPosts1 : []),
       ...(Array.isArray(wpPosts2) ? wpPosts2 : []),
     ];
-
     for (const content of publishedContent) {
       try {
         const wpPost = wpPosts.find((p: any) =>
           normalizeUrl(p.link) === normalizeUrl(content.postUrl) ||
           normalizeTitle(p.title?.rendered) === normalizeTitle(content.title)
         );
-
-        if (!wpPost) {
-          results.skipped++;
-          continue;
-        }
-
-        if (wpPost.featured_media && wpPost.featured_media > 0) {
-          results.skipped++;
-          continue;
-        }
-
+        if (!wpPost) { results.skipped++; continue; }
+        if (wpPost.featured_media && wpPost.featured_media > 0) { results.skipped++; continue; }
         const category = content.product.category || "lifestyle";
         const searchQuery = getCategoryQuery(category);
-
         let image = await searchUnsplashImage(searchQuery, usedImageUrls);
         if (!image) image = await searchUnsplashImage(getCategoryQuery(category), usedImageUrls);
         if (!image) image = await searchUnsplashImage("lifestyle shopping", usedImageUrls);
         if (!image) { results.failed++; continue; }
-
         usedImageUrls.add(image.url);
-
-        const mediaId = await uploadImageToWordPress(
-          image.url,
-          content.product.name,
-          image.photographer,
-          image.photographerUsername
-        );
+        const mediaId = await uploadImageToWordPress(image.url, content.product.name, image.photographer, image.photographerUsername);
         if (!mediaId) { results.failed++; continue; }
-
         const success = await setFeaturedImage(wpPost.id, mediaId);
         if (success) results.updated++;
         else results.failed++;
-
         await new Promise(r => setTimeout(r, 1200));
       } catch (err: any) {
         console.error(`Image error for ${content.title}:`, err?.message);
         results.failed++;
       }
     }
-
     res.json({
       message: `Added featured images to ${results.updated} posts, ${results.skipped} skipped, ${results.failed} failed.`,
       ...results,
@@ -270,24 +258,11 @@ router.post("/add-image/:postId", requireAuth, async (req, res) => {
   try {
     const image = await searchUnsplashImage(query || "lifestyle");
     if (!image) return res.status(404).json({ error: "No image found" });
-
-    const mediaId = await uploadImageToWordPress(
-      image.url,
-      query,
-      image.photographer,
-      image.photographerUsername
-    );
+    const mediaId = await uploadImageToWordPress(image.url, query, image.photographer, image.photographerUsername);
     if (!mediaId) return res.status(500).json({ error: "Failed to upload image" });
-
     const success = await setFeaturedImage(parseInt(postId), mediaId);
     if (!success) return res.status(500).json({ error: "Failed to set featured image" });
-
-    res.json({
-      message: "Featured image added!",
-      imageUrl: image.url,
-      photographer: image.photographer,
-      mediaId,
-    });
+    res.json({ message: "Featured image added!", imageUrl: image.url, photographer: image.photographer, mediaId });
   } catch (err: any) {
     res.status(500).json({ error: err?.message || "Failed" });
   }
