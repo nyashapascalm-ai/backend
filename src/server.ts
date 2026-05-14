@@ -13,6 +13,7 @@ import wordpressRouter from './routes/wordpress.ts';
 import pinterestRouter from './routes/pinterest.ts';
 import imagesRouter from './routes/images.ts';
 import subscribersRouter from './routes/subscribers.ts';
+import sponsoredRouter from './routes/sponsored.ts';
 
 const app = express();
 app.use(cors());
@@ -39,6 +40,7 @@ app.use('/wordpress', wordpressRouter);
 app.use('/pinterest', pinterestRouter);
 app.use('/images', imagesRouter);
 app.use('/', subscribersRouter);
+app.use('/', sponsoredRouter);
 
 const PORT = process.env.PORT || 3000;
 app.listen(PORT, () => {

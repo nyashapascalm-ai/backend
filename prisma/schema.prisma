@@ -39,6 +39,9 @@ model Content {
   cta             String?
   status          String   @default("draft")
   postUrl         String?
+  sponsored       Boolean  @default(false)
+  sponsorBrand    String?
+  sponsorFee      Float?
   createdAt       DateTime @default(now())
   updatedAt       DateTime @updatedAt
   product         Product  @relation(fields: [productId], references: [id])
