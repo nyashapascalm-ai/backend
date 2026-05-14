@@ -10,6 +10,41 @@ const WP_USER = process.env.WP_USER || "nyashapascalm@gmail.com";
 const WP_PASSWORD = process.env.WP_PASSWORD || "oRg4 U5w3 Ie3C u2ej daxP n7kv";
 const WP_AUTH = Buffer.from(`${WP_USER}:${WP_PASSWORD}`).toString("base64");
 
+const CATEGORY_IMAGE_QUERIES: Record<string, string[]> = {
+  "Baby & Parenting": ["baby nursery crib", "baby toys newborn", "mother baby happy", "baby clothes products"],
+  "Parenting": ["baby nursery crib", "mother baby happy", "baby products"],
+  "Furniture": ["nursery furniture baby room", "baby crib bedroom"],
+  "Nursery": ["nursery furniture baby room", "baby crib cozy"],
+  "Home & Garden": ["home interior living room", "garden flowers", "home decor lifestyle"],
+  "Home Office": ["home office desk workspace", "laptop working from home"],
+  "Bedding": ["bedroom bedding pillows", "cozy bed sheets"],
+  "Kitchen": ["kitchen cooking lifestyle", "modern kitchen home"],
+  "Pet Care": ["dog pet happy", "cat pet lifestyle", "pet products"],
+  "Pets": ["dog pet happy", "cat pet lifestyle"],
+  "Health & Wellness": ["health wellness spa", "yoga fitness wellness", "beauty skincare"],
+  "Health": ["health wellness lifestyle", "healthy living"],
+  "Wellness": ["wellness spa relaxation", "yoga meditation"],
+  "Beauty": ["beauty skincare products", "makeup cosmetics"],
+  "Fitness": ["gym fitness workout", "running exercise healthy"],
+  "Tech & AI Tools": ["technology laptop modern", "smartphone tech gadget"],
+  "Tech": ["technology laptop modern", "smartphone gadget"],
+  "AI Tools": ["technology laptop modern", "software coding"],
+  "Finance and Insurance": ["finance money savings", "insurance protection family"],
+  "Finance": ["finance money savings", "banking investment"],
+  "Insurance": ["insurance protection family", "finance savings"],
+  "Travel and Outdoors": ["travel adventure nature", "outdoor hiking landscape"],
+  "Travel": ["travel adventure nature", "holiday destination"],
+  "Outdoors": ["outdoor hiking landscape", "nature adventure"],
+  "Start up and Investment": ["business startup entrepreneur", "investment growth success"],
+  "Startup": ["business startup entrepreneur", "office team work"],
+  "Investment": ["investment growth success", "finance business"],
+  "Fashion": ["fashion clothing style", "outfit lifestyle"],
+  "Education": ["education learning books", "student studying"],
+  "Business": ["business professional office", "entrepreneur success"],
+  "Gaming": ["gaming setup computer", "game controller"],
+  "Software": ["technology laptop coding", "software development"],
+};
+
 function normalizeUrl(url: string | null | undefined): string {
   return (url || "").replace(/\/$/, "").toLowerCase().trim();
 }
@@ -113,6 +148,11 @@ async function setFeaturedImage(postId: number, mediaId: number): Promise<boolea
   }
 }
 
+function getCategoryQuery(category: string): string {
+  const queries = CATEGORY_IMAGE_QUERIES[category] || ["lifestyle shopping product"];
+  return queries[Math.floor(Math.random() * queries.length)];
+}
+
 router.post("/fix-post-urls", requireAuth, async (req, res) => {
   try {
     const published = await prisma.content.findMany({
@@ -187,12 +227,11 @@ router.post("/add-featured-images", requireAuth, async (req, res) => {
         }
 
         const category = content.product.category || "lifestyle";
-        const shortName = content.product.name.split(" ").slice(0, 4).join(" ");
-        const searchQuery = `${category} ${shortName}`.slice(0, 60);
+        const searchQuery = getCategoryQuery(category);
 
         let image = await searchUnsplashImage(searchQuery, usedImageUrls);
-        if (!image) image = await searchUnsplashImage(category, usedImageUrls);
-        if (!image) image = await searchUnsplashImage("shopping lifestyle", usedImageUrls);
+        if (!image) image = await searchUnsplashImage(getCategoryQuery(category), usedImageUrls);
+        if (!image) image = await searchUnsplashImage("lifestyle shopping", usedImageUrls);
         if (!image) { results.failed++; continue; }
 
         usedImageUrls.add(image.url);
