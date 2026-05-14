@@ -43,6 +43,12 @@ const CATEGORY_IMAGE_QUERIES: Record<string, string[]> = {
   "Business": ["business professional office", "entrepreneur success"],
   "Gaming": ["gaming setup computer", "game controller"],
   "Software": ["technology laptop coding", "software development"],
+  "Baby Products": ["baby nursery crib", "baby toys newborn", "mother baby happy"],
+  "Baby Toys": ["baby toys children playing", "infant toys colorful"],
+  "Baby Clothes": ["baby clothes newborn", "infant clothing cute"],
+  "Baby Clothes & Accessories": ["baby clothes newborn", "infant accessories"],
+  "General Household": ["home interior cozy", "household lifestyle"],
+  "Toys": ["children toys playing", "kids toys colorful"],
 };
 
 function normalizeUrl(url: string | null | undefined): string {
@@ -139,9 +145,44 @@ async function setFeaturedImage(postId: number, mediaId: number): Promise<boolea
   }
 }
 
-function getCategoryQuery(category: string): string {
-  const queries = CATEGORY_IMAGE_QUERIES[category] || ["lifestyle shopping product"];
-  return queries[Math.floor(Math.random() * queries.length)];
+function getCategoryQuery(category: string, title?: string): string {
+  // Check exact category match first
+  if (CATEGORY_IMAGE_QUERIES[category]) {
+    const queries = CATEGORY_IMAGE_QUERIES[category];
+    return queries[Math.floor(Math.random() * queries.length)];
+  }
+  // Check if category contains keywords
+  const cat = category.toLowerCase();
+  if (cat.includes("baby") || cat.includes("infant") || cat.includes("newborn") || cat.includes("toddler")) {
+    const q = ["baby nursery crib", "baby toys newborn", "mother baby happy"];
+    return q[Math.floor(Math.random() * q.length)];
+  }
+  if (cat.includes("toy") || cat.includes("play")) return "baby toys children playing";
+  if (cat.includes("furniture") || cat.includes("cot") || cat.includes("crib") || cat.includes("wardrobe") || cat.includes("dresser")) return "nursery furniture baby room";
+  if (cat.includes("cloth") || cat.includes("wear") || cat.includes("dress") || cat.includes("mitten") || cat.includes("scratch")) return "baby clothes newborn";
+  if (cat.includes("parenting") || cat.includes("nursery")) return "mother baby happy";
+  if (cat.includes("home") || cat.includes("bedding") || cat.includes("duvet") || cat.includes("curtain")) return "home interior bedroom";
+  if (cat.includes("garden") || cat.includes("outdoor")) return "garden flowers lifestyle";
+  if (cat.includes("pet") || cat.includes("dog") || cat.includes("cat")) return "dog pet happy";
+  if (cat.includes("health") || cat.includes("wellness") || cat.includes("beauty") || cat.includes("fitness")) return "health wellness spa";
+  if (cat.includes("tech") || cat.includes("software") || cat.includes("ai") || cat.includes("digital")) return "technology laptop modern";
+  if (cat.includes("travel") || cat.includes("holiday")) return "travel adventure nature";
+  if (cat.includes("finance") || cat.includes("insurance") || cat.includes("money") || cat.includes("banking")) return "finance money savings";
+  if (cat.includes("fashion") || cat.includes("style") || cat.includes("cloth")) return "fashion clothing lifestyle";
+  if (cat.includes("general") || cat.includes("household")) return "home interior cozy";
+  // Title-based fallback
+  if (title) {
+    const t = title.toLowerCase();
+    if (t.includes("baby") || t.includes("nursery") || t.includes("pram") || t.includes("pushchair") || t.includes("monitor") || t.includes("nappy") || t.includes("sleeping bag")) return "baby nursery crib";
+    if (t.includes("home") || t.includes("garden") || t.includes("bedding") || t.includes("duvet")) return "home interior living room";
+    if (t.includes("pet") || t.includes("dog") || t.includes("cat")) return "dog pet happy";
+    if (t.includes("health") || t.includes("wellness") || t.includes("ipl") || t.includes("hair removal")) return "health wellness spa";
+    if (t.includes("travel") || t.includes("insurance") || t.includes("theatre")) return "travel adventure nature";
+    if (t.includes("iso") || t.includes("training") || t.includes("course")) return "business startup entrepreneur";
+    if (t.includes("broadband") || t.includes("internet") || t.includes("tech") || t.includes("ai")) return "technology laptop modern";
+    if (t.includes("flower") || t.includes("preserved")) return "flowers bouquet lifestyle";
+  }
+  return "lifestyle shopping product";
 }
 
 router.post("/fix-post-urls", requireAuth, async (req, res) => {
@@ -226,9 +267,9 @@ router.post("/add-featured-images", requireAuth, async (req, res) => {
         if (!wpPost) { results.skipped++; continue; }
         if (wpPost.featured_media && wpPost.featured_media > 0) { results.skipped++; continue; }
         const category = content.product.category || "lifestyle";
-        const searchQuery = getCategoryQuery(category);
+        const searchQuery = getCategoryQuery(category, content.title || content.product.name);
         let image = await searchUnsplashImage(searchQuery, usedImageUrls);
-        if (!image) image = await searchUnsplashImage(getCategoryQuery(category), usedImageUrls);
+        if (!image) image = await searchUnsplashImage(getCategoryQuery(category, content.title || ""), usedImageUrls);
         if (!image) image = await searchUnsplashImage("lifestyle shopping", usedImageUrls);
         if (!image) { results.failed++; continue; }
         usedImageUrls.add(image.url);
