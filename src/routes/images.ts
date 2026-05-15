@@ -57,12 +57,9 @@ function normalizeUrl(url: string | null | undefined): string {
 
 function normalizeTitle(title: string | null | undefined): string {
   return (title || "")
-    .replace(/&#8217;/g, "'")
-    .replace(/&#8216;/g, "'")
-    .replace(/&#8220;/g, '"')
-    .replace(/&#8221;/g, '"')
-    .replace(/&amp;/g, "&")
-    .trim();
+    .replace(/&#8217;/g, "'").replace(/&#8216;/g, "'")
+    .replace(/&#8220;/g, '"').replace(/&#8221;/g, '"')
+    .replace(/&amp;/g, "&").trim();
 }
 
 async function searchUnsplashImage(
@@ -88,16 +85,11 @@ async function searchUnsplashImage(
       }
     }
     return null;
-  } catch {
-    return null;
-  }
+  } catch { return null; }
 }
 
 async function uploadImageToWordPress(
-  imageUrl: string,
-  title: string,
-  photographer: string,
-  photographerUsername: string
+  imageUrl: string, title: string, photographer: string, photographerUsername: string
 ): Promise<number | null> {
   try {
     const imgRes = await fetch(imageUrl);
@@ -140,18 +132,14 @@ async function setFeaturedImage(postId: number, mediaId: number): Promise<boolea
       body: JSON.stringify({ featured_media: mediaId }),
     });
     return res.ok;
-  } catch {
-    return false;
-  }
+  } catch { return false; }
 }
 
 function getCategoryQuery(category: string, title?: string): string {
-  // Check exact category match first
   if (CATEGORY_IMAGE_QUERIES[category]) {
     const queries = CATEGORY_IMAGE_QUERIES[category];
     return queries[Math.floor(Math.random() * queries.length)];
   }
-  // Check if category contains keywords
   const cat = category.toLowerCase();
   if (cat.includes("baby") || cat.includes("infant") || cat.includes("newborn") || cat.includes("toddler")) {
     const q = ["baby nursery crib", "baby toys newborn", "mother baby happy"];
@@ -159,7 +147,7 @@ function getCategoryQuery(category: string, title?: string): string {
   }
   if (cat.includes("toy") || cat.includes("play")) return "baby toys children playing";
   if (cat.includes("furniture") || cat.includes("cot") || cat.includes("crib") || cat.includes("wardrobe") || cat.includes("dresser")) return "nursery furniture baby room";
-  if (cat.includes("cloth") || cat.includes("wear") || cat.includes("dress") || cat.includes("mitten") || cat.includes("scratch")) return "baby clothes newborn";
+  if (cat.includes("cloth") || cat.includes("wear") || cat.includes("dress") || cat.includes("mitten")) return "baby clothes newborn";
   if (cat.includes("parenting") || cat.includes("nursery")) return "mother baby happy";
   if (cat.includes("home") || cat.includes("bedding") || cat.includes("duvet") || cat.includes("curtain")) return "home interior bedroom";
   if (cat.includes("garden") || cat.includes("outdoor")) return "garden flowers lifestyle";
@@ -168,18 +156,17 @@ function getCategoryQuery(category: string, title?: string): string {
   if (cat.includes("tech") || cat.includes("software") || cat.includes("ai") || cat.includes("digital")) return "technology laptop modern";
   if (cat.includes("travel") || cat.includes("holiday")) return "travel adventure nature";
   if (cat.includes("finance") || cat.includes("insurance") || cat.includes("money") || cat.includes("banking")) return "finance money savings";
-  if (cat.includes("fashion") || cat.includes("style") || cat.includes("cloth")) return "fashion clothing lifestyle";
+  if (cat.includes("fashion") || cat.includes("style")) return "fashion clothing lifestyle";
   if (cat.includes("general") || cat.includes("household")) return "home interior cozy";
-  // Title-based fallback
   if (title) {
     const t = title.toLowerCase();
-    if (t.includes("baby") || t.includes("nursery") || t.includes("pram") || t.includes("pushchair") || t.includes("monitor") || t.includes("nappy") || t.includes("sleeping bag")) return "baby nursery crib";
-    if (t.includes("home") || t.includes("garden") || t.includes("bedding") || t.includes("duvet")) return "home interior living room";
+    if (t.includes("baby") || t.includes("nursery") || t.includes("pram") || t.includes("pushchair") || t.includes("monitor") || t.includes("sleeping bag") || t.includes("mamas") || t.includes("papas") || t.includes("ergobaby") || t.includes("cybex") || t.includes("bugaboo")) return "baby nursery crib";
+    if (t.includes("home") || t.includes("garden") || t.includes("bedding") || t.includes("duvet") || t.includes("bed runner")) return "home interior living room";
     if (t.includes("pet") || t.includes("dog") || t.includes("cat")) return "dog pet happy";
     if (t.includes("health") || t.includes("wellness") || t.includes("ipl") || t.includes("hair removal")) return "health wellness spa";
     if (t.includes("travel") || t.includes("insurance") || t.includes("theatre")) return "travel adventure nature";
-    if (t.includes("iso") || t.includes("training") || t.includes("course")) return "business startup entrepreneur";
-    if (t.includes("broadband") || t.includes("internet") || t.includes("tech") || t.includes("ai")) return "technology laptop modern";
+    if (t.includes("iso") || t.includes("training") || t.includes("course") || t.includes("isoqar")) return "business startup entrepreneur";
+    if (t.includes("broadband") || t.includes("internet") || t.includes("tech") || t.includes("ai") || t.includes("jasper") || t.includes("grammarly") || t.includes("canva") || t.includes("zzoomm")) return "technology laptop modern";
     if (t.includes("flower") || t.includes("preserved")) return "flowers bouquet lifestyle";
   }
   return "lifestyle shopping product";
@@ -187,16 +174,11 @@ function getCategoryQuery(category: string, title?: string): string {
 
 router.post("/fix-post-urls", requireAuth, async (req, res) => {
   try {
-    const published = await prisma.content.findMany({
-      where: { type: "blog", status: "published" },
-    });
+    const published = await prisma.content.findMany({ where: { type: "blog", status: "published" } });
     let fixed = 0;
     for (const content of published) {
       if (content.postUrl?.includes("hostingersite.com")) {
-        const newUrl = content.postUrl.replace(
-          "https://hotpink-jay-474959.hostingersite.com",
-          "https://mumdeals.co.uk"
-        );
+        const newUrl = content.postUrl.replace("https://hotpink-jay-474959.hostingersite.com", "https://mumdeals.co.uk");
         await prisma.content.update({ where: { id: content.id }, data: { postUrl: newUrl } });
         fixed++;
       }
@@ -209,18 +191,17 @@ router.post("/fix-post-urls", requireAuth, async (req, res) => {
 
 router.post("/reset-featured-images", requireAuth, async (req, res) => {
   try {
-    const wpRes1 = await fetch(`${WP_URL}/wp-json/wp/v2/posts?per_page=100&page=1`, {
-      headers: { Authorization: `Basic ${WP_AUTH}` },
-    });
-    const wpRes2 = await fetch(`${WP_URL}/wp-json/wp/v2/posts?per_page=100&page=2`, {
-      headers: { Authorization: `Basic ${WP_AUTH}` },
-    });
-    const posts1 = await wpRes1.json();
-    const posts2 = wpRes2.ok ? await wpRes2.json() : [];
-    const allPosts = [
-      ...(Array.isArray(posts1) ? posts1 : []),
-      ...(Array.isArray(posts2) ? posts2 : []),
-    ];
+    const pages = [1, 2, 3];
+    const allPosts: any[] = [];
+    for (const page of pages) {
+      const wpRes = await fetch(`${WP_URL}/wp-json/wp/v2/posts?per_page=100&page=${page}`, {
+        headers: { Authorization: `Basic ${WP_AUTH}` },
+      });
+      if (!wpRes.ok) break;
+      const posts = await wpRes.json();
+      if (!Array.isArray(posts) || posts.length === 0) break;
+      allPosts.push(...posts);
+    }
     let reset = 0;
     for (const post of allPosts) {
       if (post.featured_media && post.featured_media > 0) {
@@ -244,48 +225,65 @@ router.post("/add-featured-images", requireAuth, async (req, res) => {
       where: { type: "blog", status: "published" },
       include: { product: true },
     });
-    const results = { updated: 0, failed: 0, skipped: 0 };
+    const results = { updated: 0, failed: 0, skipped: 0, remaining: 0 };
     const usedImageUrls = new Set<string>();
-    const wpRes1 = await fetch(`${WP_URL}/wp-json/wp/v2/posts?per_page=100&orderby=date&order=desc&page=1`, {
-      headers: { Authorization: `Basic ${WP_AUTH}` },
+
+    const pages = [1, 2, 3];
+    const allWpPosts: any[] = [];
+    for (const page of pages) {
+      const wpRes = await fetch(`${WP_URL}/wp-json/wp/v2/posts?per_page=100&orderby=date&order=desc&page=${page}`, {
+        headers: { Authorization: `Basic ${WP_AUTH}` },
+      });
+      if (!wpRes.ok) break;
+      const posts = await wpRes.json();
+      if (!Array.isArray(posts) || posts.length === 0) break;
+      allWpPosts.push(...posts);
+    }
+
+    // Only process posts that need images — batch of 30
+    const needsImage = publishedContent.filter(content => {
+      const wpPost = allWpPosts.find((p: any) =>
+        normalizeUrl(p.link) === normalizeUrl(content.postUrl) ||
+        normalizeTitle(p.title?.rendered) === normalizeTitle(content.title)
+      );
+      return wpPost && (!wpPost.featured_media || wpPost.featured_media === 0);
     });
-    const wpPosts1 = await wpRes1.json();
-    const wpRes2 = await fetch(`${WP_URL}/wp-json/wp/v2/posts?per_page=100&orderby=date&order=desc&page=2`, {
-      headers: { Authorization: `Basic ${WP_AUTH}` },
-    });
-    const wpPosts2 = wpRes2.ok ? await wpRes2.json() : [];
-    const wpPosts = [
-      ...(Array.isArray(wpPosts1) ? wpPosts1 : []),
-      ...(Array.isArray(wpPosts2) ? wpPosts2 : []),
-    ];
-    for (const content of publishedContent) {
+
+    const batch = needsImage.slice(0, 30);
+    results.remaining = Math.max(0, needsImage.length - 30);
+
+    for (const content of batch) {
       try {
-        const wpPost = wpPosts.find((p: any) =>
+        const wpPost = allWpPosts.find((p: any) =>
           normalizeUrl(p.link) === normalizeUrl(content.postUrl) ||
           normalizeTitle(p.title?.rendered) === normalizeTitle(content.title)
         );
         if (!wpPost) { results.skipped++; continue; }
-        if (wpPost.featured_media && wpPost.featured_media > 0) { results.skipped++; continue; }
+
         const category = content.product.category || "lifestyle";
         const searchQuery = getCategoryQuery(category, content.title || content.product.name);
         let image = await searchUnsplashImage(searchQuery, usedImageUrls);
         if (!image) image = await searchUnsplashImage(getCategoryQuery(category, content.title || ""), usedImageUrls);
         if (!image) image = await searchUnsplashImage("lifestyle shopping", usedImageUrls);
         if (!image) { results.failed++; continue; }
+
         usedImageUrls.add(image.url);
         const mediaId = await uploadImageToWordPress(image.url, content.product.name, image.photographer, image.photographerUsername);
         if (!mediaId) { results.failed++; continue; }
+
         const success = await setFeaturedImage(wpPost.id, mediaId);
         if (success) results.updated++;
         else results.failed++;
-        await new Promise(r => setTimeout(r, 1200));
+
+        await new Promise(r => setTimeout(r, 1000));
       } catch (err: any) {
         console.error(`Image error for ${content.title}:`, err?.message);
         results.failed++;
       }
     }
+
     res.json({
-      message: `Added featured images to ${results.updated} posts, ${results.skipped} skipped, ${results.failed} failed.`,
+      message: `Added featured images to ${results.updated} posts, ${results.skipped} skipped, ${results.failed} failed. ${results.remaining} posts still need images — run again!`,
       ...results,
     });
   } catch (err: any) {
