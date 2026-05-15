@@ -28,16 +28,49 @@ async function generateForProduct(productId: number, type: string, anthropic: An
     "Parenting": "Target audience: parents wanting the best for their children.",
     "Baby & Parenting": "Target audience: parents wanting the best for their children. Use language around safety, development, joy, and making memories.",
     "Furniture": "Target audience: parents setting up a nursery or home. Use language around safety, quality, and value.",
+    "Baby Products": "Target audience: parents wanting the best baby essentials. Use language around safety, comfort, and development.",
+    "Baby Toys": "Target audience: parents wanting engaging, safe toys for their babies.",
+    "Baby Clothes": "Target audience: parents wanting comfortable, quality clothing for their babies.",
+    "General Household": "Target audience: homeowners wanting quality household products.",
+    "Toys": "Target audience: parents and gift-givers wanting fun, educational toys.",
     "Pet Care": "Target audience: pet owners who treat their pets like family.",
     "Travel and Outdoors": "Target audience: adventure seekers and families wanting to explore the world.",
     "Start up and Investment": "Target audience: entrepreneurs and investors wanting to grow their wealth and business.",
   };
 
-  const audienceContext = nicheContext[niche] || "Target a broad audience interested in quality products.";
+  const audienceContext = nicheContext[niche] || "Target a broad UK audience interested in quality products.";
 
   const prompts: Record<string, string> = {
     tiktok: `You are an expert affiliate marketer specializing in the ${niche} niche. Create a viral TikTok video script for this product. ${audienceContext} Product: ${product.name}. Description: ${product.description}. Price: ${product.price}. Commission: ${product.commissionRate}%. Return a JSON object with these exact fields: { "title": "viral hook title", "scriptText": "full spoken script 60-90 seconds", "caption": "TikTok caption under 150 chars", "hashtags": "#tag1 #tag2 #tag3 #tag4 #tag5", "thumbnailPrompt": "description for thumbnail", "cta": "call to action" }. Return only valid JSON, no other text.`,
-    blog: `You are an expert affiliate content writer specializing in the ${niche} niche. Write a high-converting blog post for this product. ${audienceContext} Product: ${product.name}. Description: ${product.description}. Price: £${product.price}. Return a JSON object with these exact fields: { "title": "SEO blog post title", "scriptText": "full blog post 400-600 words in markdown", "caption": "meta description under 160 chars", "hashtags": "keyword1, keyword2, keyword3", "thumbnailPrompt": "description for featured image", "cta": "call to action" }. Return only valid JSON, no other text.`,
+    blog: `You are an expert UK affiliate content writer specializing in the ${niche} niche. Write a high-converting blog post for this product. ${audienceContext}
+
+Product: ${product.name}
+Description: ${product.description}
+Price: £${product.price}
+Category: ${niche}
+
+Write a blog post that:
+1. Has an engaging UK-focused intro
+2. Covers key features and benefits
+3. Explains why UK buyers should choose this product
+4. Has a clear recommendation
+5. Is 400-600 words
+6. Uses UK English throughout
+7. Is SEO-optimized for ${new Date().getFullYear()}
+
+The content MUST be specifically about: ${product.name}
+Do NOT write about any other product.
+
+Return a JSON object with these exact fields:
+{
+  "title": "SEO blog post title mentioning ${product.name.split(" ").slice(0, 4).join(" ")} UK ${new Date().getFullYear()}",
+  "scriptText": "full blog post HTML content about ${product.name}",
+  "caption": "meta description under 160 chars",
+  "hashtags": "keyword1, keyword2, keyword3",
+  "thumbnailPrompt": "description for featured image",
+  "cta": "call to action"
+}
+Return only valid JSON, no other text.`,
     instagram: `You are an expert affiliate marketer specializing in the ${niche} niche. Create a high-engagement Instagram post for this product. ${audienceContext} Product: ${product.name}. Description: ${product.description}. Price: £${product.price}. Return a JSON object with these exact fields: { "title": "Instagram post hook", "scriptText": "full Instagram caption 150-300 words", "caption": "short version under 125 chars", "hashtags": "#tag1 #tag2 #tag3 #tag4 #tag5 #tag6 #tag7 #tag8", "thumbnailPrompt": "description for Instagram image", "cta": "call to action" }. Return only valid JSON, no other text.`,
   };
 
@@ -132,9 +165,7 @@ router.post("/generate-comparison", requireAuth, async (req, res) => {
   try {
     let products;
     if (productIds?.length) {
-      products = await prisma.product.findMany({
-        where: { id: { in: productIds }, status: "active" },
-      });
+      products = await prisma.product.findMany({ where: { id: { in: productIds }, status: "active" } });
     } else {
       products = await prisma.product.findMany({
         where: {
@@ -144,27 +175,19 @@ router.post("/generate-comparison", requireAuth, async (req, res) => {
         },
         take: 8,
       });
-
       if (products.length < 2 && maxPrice) {
         products = await prisma.product.findMany({
-          where: {
-            status: "active",
-            ...(category ? { category } : {}),
-          },
+          where: { status: "active", ...(category ? { category } : {}) },
           take: 8,
         });
       }
-
       if (products.length < 2) {
-        products = await prisma.product.findMany({
-          where: { status: "active" },
-          take: 8,
-        });
+        products = await prisma.product.findMany({ where: { status: "active" }, take: 8 });
       }
     }
 
     if (products.length < 2) {
-      return res.status(400).json({ error: "Not enough active products in database to generate a comparison post" });
+      return res.status(400).json({ error: "Not enough active products to generate a comparison post" });
     }
 
     const productList = products.map((p, i) =>
@@ -189,26 +212,25 @@ Write a detailed comparison post that:
 6. Uses UK English
 7. Is SEO-optimized for the title keywords
 
-Also generate 5 FAQ questions and answers about these products that people commonly search for on Google UK.
+Also generate 5 FAQ questions and answers about these products.
 
-Return a JSON object with these exact fields:
+Return a JSON object:
 {
   "title": "${postTitle}",
   "scriptText": "full blog post HTML content",
   "caption": "meta description under 160 chars",
   "hashtags": "keyword1, keyword2, keyword3, keyword4",
   "thumbnailPrompt": "description for featured image",
-  "cta": "compelling call to action sentence",
+  "cta": "compelling call to action",
   "faqs": [
-    {"question": "Question 1?", "answer": "Answer 1"},
-    {"question": "Question 2?", "answer": "Answer 2"},
-    {"question": "Question 3?", "answer": "Answer 3"},
-    {"question": "Question 4?", "answer": "Answer 4"},
-    {"question": "Question 5?", "answer": "Answer 5"}
+    {"question": "Q1?", "answer": "A1"},
+    {"question": "Q2?", "answer": "A2"},
+    {"question": "Q3?", "answer": "A3"},
+    {"question": "Q4?", "answer": "A4"},
+    {"question": "Q5?", "answer": "A5"}
   ]
 }
-
-Return only valid JSON, no other text.`;
+Return only valid JSON.`;
 
     const message = await anthropic.messages.create({
       model: "claude-haiku-4-5-20251001",
@@ -220,7 +242,6 @@ Return only valid JSON, no other text.`;
     const clean = text.replace(/```json|```/g, "").trim();
     const parsed = JSON.parse(clean);
 
-    // Build FAQ HTML section
     const faqHtml = parsed.faqs?.length ? `
 <div class="faq-section" style="margin-top: 32px;">
   <h2 style="font-size: 24px; margin-bottom: 16px;">Frequently Asked Questions</h2>
@@ -231,22 +252,16 @@ Return only valid JSON, no other text.`;
   </div>`).join("")}
 </div>` : "";
 
-    // Build FAQ schema
     const faqSchema = parsed.faqs?.length ? `
 <script type="application/ld+json">
 {
   "@context": "https://schema.org",
   "@type": "FAQPage",
-  "mainEntity": [
-    ${parsed.faqs.map((f: any) => `{
-      "@type": "Question",
-      "name": "${f.question.replace(/"/g, '\\"')}",
-      "acceptedAnswer": {
-        "@type": "Answer",
-        "text": "${f.answer.replace(/"/g, '\\"')}"
-      }
-    }`).join(",")}
-  ]
+  "mainEntity": [${parsed.faqs.map((f: any) => `{
+    "@type": "Question",
+    "name": "${f.question.replace(/"/g, '\\"')}",
+    "acceptedAnswer": { "@type": "Answer", "text": "${f.answer.replace(/"/g, '\\"')}" }
+  }`).join(",")}]
 }
 </script>` : "";
 
@@ -276,6 +291,17 @@ Return only valid JSON, no other text.`;
   } catch (err: any) {
     console.error("Comparison generation error:", err?.message);
     res.status(500).json({ error: err?.message || "Failed to generate comparison post" });
+  }
+});
+
+router.post("/delete-all", requireAuth, async (req, res) => {
+  try {
+    const result = await prisma.content.deleteMany({
+      where: { type: "blog", sponsored: false },
+    });
+    res.json({ message: `Deleted ${result.count} blog posts from database. Ready to regenerate fresh.`, count: result.count });
+  } catch (err: any) {
+    res.status(500).json({ error: err?.message || "Failed to delete content" });
   }
 });
 
