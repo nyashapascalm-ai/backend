@@ -5,11 +5,34 @@ import { requireAuth } from "../middleware/auth.js";
 const router = Router();
 
 const PINTEREST_TOKEN = process.env.PINTEREST_TOKEN || "";
-const BOARD_ID = process.env.PINTEREST_BOARD_ID || "mumcircle3/baby-parenting-deals";
+let BOARD_ID = process.env.PINTEREST_BOARD_ID || "";
+
+async function getBoardId(): Promise<string> {
+  if (BOARD_ID && !BOARD_ID.includes("/")) return BOARD_ID;
+  try {
+    const res = await fetch(`https://api.pinterest.com/v5/boards?page_size=25`, {
+      headers: { Authorization: `Bearer ${PINTEREST_TOKEN}` },
+    });
+    const data = await res.json();
+    if (data.items?.length > 0) {
+      const board = data.items.find((b: any) =>
+        b.name?.toLowerCase().includes("baby") ||
+        b.name?.toLowerCase().includes("deals") ||
+        b.name?.toLowerCase().includes("mum")
+      ) || data.items[0];
+      BOARD_ID = board.id;
+      return board.id;
+    }
+    throw new Error("No boards found");
+  } catch (err: any) {
+    throw new Error(`Failed to get board ID: ${err.message}`);
+  }
+}
 
 async function createPin(title: string, description: string, link: string, imageUrl?: string) {
+  const boardId = await getBoardId();
   const body: any = {
-    board_id: BOARD_ID,
+    board_id: boardId,
     title: title.slice(0, 100),
     description: description.slice(0, 500),
     link,
@@ -42,7 +65,7 @@ router.post("/pin/:productId", requireAuth, async (req, res) => {
       where: { id: productId },
       include: {
         content: {
-          where: { type: "instagram" },
+          where: { type: "blog" },
           orderBy: { createdAt: "desc" },
           take: 1,
         },
@@ -56,10 +79,11 @@ router.post("/pin/:productId", requireAuth, async (req, res) => {
       : product.affiliateLink || "https://mumdeals.co.uk";
 
     const caption = product.content[0]?.caption || `Check out ${product.name} — great deal!`;
-    const hashtags = product.content[0]?.hashtags || "#mumdeals #babydeals #parenting";
+    const hashtags = product.content[0]?.hashtags || "#mumdeals #ukdeals #parenting";
     const description = `${caption}\n\n${hashtags}`;
+    const imageUrl = product.imageUrl || undefined;
 
-    const pin = await createPin(product.name, description, trackingLink);
+    const pin = await createPin(product.name, description, trackingLink, imageUrl);
 
     res.json({
       message: "Pin created!",
@@ -78,11 +102,12 @@ router.post("/pin-all-products", requireAuth, async (req, res) => {
       where: { status: "active" },
       include: {
         content: {
-          where: { type: "instagram" },
+          where: { type: "blog" },
           orderBy: { createdAt: "desc" },
           take: 1,
         },
       },
+      take: 50,
     });
 
     const results = { created: 0, failed: 0, pins: [] as string[] };
@@ -94,15 +119,16 @@ router.post("/pin-all-products", requireAuth, async (req, res) => {
           : product.affiliateLink || "https://mumdeals.co.uk";
 
         const caption = product.content[0]?.caption || `Check out ${product.name}!`;
-        const hashtags = product.content[0]?.hashtags || "#mumdeals #babydeals #parenting";
+        const hashtags = product.content[0]?.hashtags || "#mumdeals #ukdeals #parenting";
         const description = `${caption}\n\n${hashtags}`;
+        const imageUrl = product.imageUrl || undefined;
 
-        const pin = await createPin(product.name, description, trackingLink);
+        const pin = await createPin(product.name, description, trackingLink, imageUrl);
 
         results.created++;
         results.pins.push(`https://pinterest.com/pin/${pin.id}`);
 
-        await new Promise(r => setTimeout(r, 500));
+        await new Promise(r => setTimeout(r, 1000));
       } catch (err: any) {
         console.error(`Pin failed for ${product.name}:`, err?.message);
         results.failed++;
@@ -120,13 +146,25 @@ router.post("/pin-all-products", requireAuth, async (req, res) => {
 
 router.get("/board", requireAuth, async (req, res) => {
   try {
-    const res2 = await fetch(`https://api.pinterest.com/v5/boards/${BOARD_ID}`, {
+    const boardRes = await fetch(`https://api.pinterest.com/v5/boards?page_size=25`, {
       headers: { Authorization: `Bearer ${PINTEREST_TOKEN}` },
     });
-    const data = await res2.json();
+    const data = await boardRes.json();
     res.json(data);
   } catch (err: any) {
-    res.status(500).json({ error: err?.message || "Failed to fetch board" });
+    res.status(500).json({ error: err?.message || "Failed to fetch boards" });
+  }
+});
+
+router.get("/user", requireAuth, async (req, res) => {
+  try {
+    const userRes = await fetch(`https://api.pinterest.com/v5/user_account`, {
+      headers: { Authorization: `Bearer ${PINTEREST_TOKEN}` },
+    });
+    const data = await userRes.json();
+    res.json(data);
+  } catch (err: any) {
+    res.status(500).json({ error: err?.message || "Failed to fetch user" });
   }
 });
 
