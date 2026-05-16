@@ -11,36 +11,16 @@ router.post("/chat", async (req, res) => {
 
     const products = await prisma.product.findMany({
       where: { status: "active" },
-      select: { id: true, name: true, category: true, price: true, slug: true, description: true, commissionRate: true },
-      take: 50,
+      select: { id: true, name: true, category: true, price: true, slug: true, commissionRate: true },
+      take: 30,
+      orderBy: { commissionRate: "desc" },
     });
 
     const productList = products.map(p =>
-      `- ${p.name} (${p.category}) £${p.price} | link: https://backend-production-c3f5.up.railway.app/track/go/${p.slug}`
+      p.name + " | " + p.category + " | GBP" + p.price + " | https://mumdeals.co.uk/track/go/" + p.slug
     ).join("\n");
 
-    const systemPrompt = `You are MumDeals Assistant, a smart deals advisor on mumdeals.co.uk - a UK deals and affiliate site.
-
-Your job is to:
-1. Understand what the visitor needs (baby products, home, tech, health, travel, finance etc)
-2. Recommend specific products from our catalogue with their tracking links
-3. After showing 2-3 products, invite them to subscribe to weekly deals
-4. Be concise, helpful and direct. Max 3 sentences per response.
-5. Always include product links when recommending products
-6. Use UK English
-
-Current page: ${pageUrl || "mumdeals.co.uk"}
-Page category: ${pageCategory || "general"}
-
-Available products:
-${productList}
-
-Rules:
-- Only recommend products from the list above
-- Always use the exact tracking links provided
-- Format product recommendations as: **Product Name** - £price [View Deal](link)
-- If asked about something not in catalogue, suggest subscribing for more deals
-- Keep responses short and actionable`;
+    const systemPrompt = "You are MumDeals Advisor, a smart deals assistant on mumdeals.co.uk.\n\nCRITICAL FORMATTING RULES:\n- When recommending a product, ALWAYS use this EXACT format on its own line:\n  DEAL: Product Name | GBPprice | https://mumdeals.co.uk/track/go/slug\n- Recommend 1-3 products max per response\n- Keep text responses to 1-2 short sentences\n- Use UK English\n- Never make up products - only use products from the list below\n- After recommending products, invite them to subscribe for weekly deals\n\nCurrent page: " + (pageUrl || "mumdeals.co.uk") + "\nCategory: " + (pageCategory || "general") + "\n\nProducts (Name | Category | Price | Link):\n" + productList;
 
     const messages = [
       ...(history || []),
@@ -49,14 +29,13 @@ Rules:
 
     const response = await anthropic.messages.create({
       model: "claude-haiku-4-5-20251001",
-      max_tokens: 300,
+      max_tokens: 250,
       system: systemPrompt,
       messages,
     });
 
     const reply = response.content[0].type === "text" ? response.content[0].text : "";
-
-    res.json({ reply, usage: response.usage });
+    res.json({ reply });
   } catch (err: any) {
     console.error("Chatbot error:", err?.message);
     res.status(500).json({ error: err?.message || "Chat failed" });
