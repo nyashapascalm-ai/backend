@@ -66,3 +66,23 @@ model Subscriber {
   source    String?
   createdAt DateTime @default(now())
 }
+
+model Ad {
+  id          Int      @id @default(autoincrement())
+  title       String
+  advertiser  String
+  size        String
+  position    String
+  mediaUrl    String
+  linkUrl     String
+  altText     String?
+  startDate   DateTime
+  endDate     DateTime
+  fee         Float?
+  status      String   @default("active")
+  impressions Int      @default(0)
+  clicks      Int      @default(0)
+  notes       String?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+}
