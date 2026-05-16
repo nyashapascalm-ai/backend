@@ -16,6 +16,7 @@ import subscribersRouter from './routes/subscribers.ts';
 import sponsoredRouter from './routes/sponsored.ts';
 import refreshRouter from './routes/refresh.ts';
 import adsRouter from './routes/ads.ts';
+import chatbotRouter from './routes/chatbot.ts';
 
 const app = express();
 app.use(cors());
@@ -40,6 +41,7 @@ app.use('/reports', reportsRouter);
 app.use('/awin', awinRouter);
 app.use('/wordpress', wordpressRouter);
 app.use('/ads', adsRouter);
+app.use('/chatbot', chatbotRouter);
 app.use('/pinterest', pinterestRouter);
 app.use('/images', imagesRouter);
 app.use('/', subscribersRouter);
